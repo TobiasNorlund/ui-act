@@ -41,65 +41,123 @@ class MPXEnvironment:
 
     def __enter__(self):
         # Create a virtual mouse device
-        capabilities = {
+        mouse_capabilities = {
             e.EV_ABS: [
                 (e.ABS_X, AbsInfo(0, 0, self.width - 1, 0, 0, 0)),
                 (e.ABS_Y, AbsInfo(0, 0, self.height - 1, 0, 0, 0)),
             ],
             e.EV_KEY: [e.BTN_LEFT, e.BTN_RIGHT],
         }
-        self.ui = UInput(capabilities, name="CoX Mouse Device")
+        self.mouse_ui = UInput(mouse_capabilities, name="CoX Mouse Device")
         mouse_id = get_device_id("CoX Mouse Device")
         if mouse_id is None:
             raise RuntimeError("Could not find device ID for 'CoX Mouse Device'")
+
+        # Create a virtual keyboard device
+        keyboard_capabilities = {
+            e.EV_KEY: [
+                e.KEY_A, e.KEY_B, e.KEY_C, e.KEY_D, e.KEY_E, e.KEY_F, e.KEY_G, e.KEY_H, e.KEY_I, e.KEY_J,
+                e.KEY_K, e.KEY_L, e.KEY_M, e.KEY_N, e.KEY_O, e.KEY_P, e.KEY_Q, e.KEY_R, e.KEY_S, e.KEY_T,
+                e.KEY_U, e.KEY_V, e.KEY_W, e.KEY_X, e.KEY_Y, e.KEY_Z,
+                e.KEY_1, e.KEY_2, e.KEY_3, e.KEY_4, e.KEY_5, e.KEY_6, e.KEY_7, e.KEY_8, e.KEY_9, e.KEY_0,
+                e.KEY_SPACE, e.KEY_ENTER, e.KEY_BACKSPACE, e.KEY_TAB, e.KEY_ESC,
+                e.KEY_LEFTSHIFT, e.KEY_RIGHTSHIFT, e.KEY_LEFTCTRL, e.KEY_RIGHTCTRL,
+                e.KEY_LEFTALT, e.KEY_RIGHTALT, e.KEY_LEFTMETA, e.KEY_RIGHTMETA,
+                e.KEY_MINUS, e.KEY_EQUAL, e.KEY_LEFTBRACE, e.KEY_RIGHTBRACE,
+                e.KEY_SEMICOLON, e.KEY_APOSTROPHE, e.KEY_GRAVE, e.KEY_BACKSLASH,
+                e.KEY_COMMA, e.KEY_DOT, e.KEY_SLASH
+            ]
+        }
+        self.keyboard_ui = UInput(keyboard_capabilities, name="CoX Keyboard Device")
+        keyboard_id = get_device_id("CoX Keyboard Device")
+        print(keyboard_id)
+        if keyboard_id is None:
+            raise RuntimeError("Could not find device ID for 'CoX Keyboard Device'")
 
         # Create a new MPX master device
         result = subprocess.run(['xinput', 'create-master', 'CoX'])
         if result.returncode != 0:
             raise RuntimeError("Failed to create MPX master device")
-        self.master_id = get_device_id("CoX pointer")
+        self.master_mouse_id = get_device_id("CoX pointer")
+        self.master_keyboard_id = get_device_id("CoX keyboard")
         
-        # Attach the virtual mouse to the MPX master device
-        result = subprocess.run(['xinput', 'reattach', str(mouse_id), str(self.master_id)])
+        # Attach the virtual devices to the MPX master device
+        result = subprocess.run(['xinput', 'reattach', str(mouse_id), str(self.master_mouse_id)])
         if result.returncode != 0:
             raise RuntimeError("Failed to attach virtual mouse to MPX master device")
+        
+        # Seems necessary to avoid very erradic behavior
+        time.sleep(0.1)
+        
+        result = subprocess.run(['xinput', 'reattach', str(keyboard_id), str(self.master_keyboard_id)])
+        if result.returncode != 0:
+            raise RuntimeError("Failed to attach virtual keyboard to MPX master device")
         
         return self
     
     def __exit__(self, exc_type, exc_value, traceback):
-        # Remove the virtual mouse device
-        self.ui.close()
+        # Remove the virtual devices
+        self.mouse_ui.close()
+        self.keyboard_ui.close()
 
         # Remove the MPX master device
-        result = subprocess.run(['xinput', 'remove-master', str(self.master_id)])
+        result = subprocess.run(['xinput', 'remove-master', str(self.master_mouse_id)])
         if result.returncode != 0:
             raise RuntimeError("Failed to remove MPX master device")
 
     def move_to(self, x, y):
-        self.ui.write(e.EV_ABS, e.ABS_X, x)
-        self.ui.write(e.EV_ABS, e.ABS_Y, y)
-        self.ui.syn()
+        self.mouse_ui.write(e.EV_ABS, e.ABS_X, x)
+        self.mouse_ui.write(e.EV_ABS, e.ABS_Y, y)
+        self.mouse_ui.syn()
         print(f"Moved to {x}, {y}")
 
     def left_click(self):
-        self.ui.write(e.EV_KEY, e.BTN_LEFT, 1)
-        self.ui.syn()
+        self.mouse_ui.write(e.EV_KEY, e.BTN_LEFT, 1)
+        self.mouse_ui.syn()
         time.sleep(0.1)
-        self.ui.write(e.EV_KEY, e.BTN_LEFT, 0)
-        self.ui.syn()
+        self.mouse_ui.write(e.EV_KEY, e.BTN_LEFT, 0)
+        self.mouse_ui.syn()
 
     def right_click(self):
-        self.ui.write(e.EV_KEY, e.BTN_RIGHT, 1)
-        self.ui.syn()
+        self.mouse_ui.write(e.EV_KEY, e.BTN_RIGHT, 1)
+        self.mouse_ui.syn()
         time.sleep(0.1)
-        self.ui.write(e.EV_KEY, e.BTN_RIGHT, 0)
-        self.ui.syn()
+        self.mouse_ui.write(e.EV_KEY, e.BTN_RIGHT, 0)
+        self.mouse_ui.syn()
+
+    def press_key(self, key_code):
+        """Press and release a key."""
+        self.keyboard_ui.write(e.EV_KEY, key_code, 1)
+        self.keyboard_ui.syn()
+        time.sleep(0.05)
+        self.keyboard_ui.write(e.EV_KEY, key_code, 0)
+        self.keyboard_ui.syn()
+
+    def type_text(self, text):
+        """Type a string of text."""
+        for char in text:
+            if char.isupper():
+                # Press shift for uppercase letters
+                self.keyboard_ui.write(e.EV_KEY, e.KEY_LEFTSHIFT, 1)
+                self.keyboard_ui.syn()
+            
+            # Map character to key code
+            key_code = getattr(e, f'KEY_{char.upper()}', None)
+            if key_code is not None:
+                self.press_key(key_code)
+            
+            if char.isupper():
+                # Release shift
+                self.keyboard_ui.write(e.EV_KEY, e.KEY_LEFTSHIFT, 0)
+                self.keyboard_ui.syn()
+            
+            time.sleep(0.05)  # Small delay between keystrokes
 
 
 def main():
     with MPXEnvironment() as env:
         positions = [(100, 100), (env.width // 2, env.height // 2), (env.width - 200, env.height - 200), (100, 100)]
-        
+        time.sleep(5)
         for x, y in positions:
             env.move_to(x, y)
             time.sleep(1)
