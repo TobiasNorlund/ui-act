@@ -2,6 +2,9 @@ import subprocess
 from evdev import UInput, ecodes as e, AbsInfo
 import time
 import re
+import base64
+from PIL import Image, ImageGrab
+import io
 
 
 def get_screen_resolution():
@@ -70,7 +73,6 @@ class MPXEnvironment:
         }
         self.keyboard_ui = UInput(keyboard_capabilities, name="CoX Keyboard Device")
         keyboard_id = get_device_id("CoX Keyboard Device")
-        print(keyboard_id)
         if keyboard_id is None:
             raise RuntimeError("Could not find device ID for 'CoX Keyboard Device'")
 
@@ -87,7 +89,7 @@ class MPXEnvironment:
             raise RuntimeError("Failed to attach virtual mouse to MPX master device")
         
         # Seems necessary to avoid very erradic behavior
-        time.sleep(0.1)
+        time.sleep(0.5)
         
         result = subprocess.run(['xinput', 'reattach', str(keyboard_id), str(self.master_keyboard_id)])
         if result.returncode != 0:
@@ -133,7 +135,17 @@ class MPXEnvironment:
         self.keyboard_ui.write(e.EV_KEY, key_code, 0)
         self.keyboard_ui.syn()
 
-    def type_text(self, text):
+    def click(self, x: int, y: int, button: str = "left") -> None:
+        if button == "left":
+            self.move_to(x, y)
+            self.left_click()
+        elif button == "right":
+            self.move_to(x, y)
+            self.right_click()
+        else:
+            raise ValueError(f"Invalid button: {button}")
+
+    def type(self, text):
         """Type a string of text."""
         for char in text:
             if char.isupper():
@@ -152,6 +164,22 @@ class MPXEnvironment:
                 self.keyboard_ui.syn()
             
             time.sleep(0.05)  # Small delay between keystrokes
+
+    def wait(self, ms: int = 1000) -> None:
+        time.sleep(ms / 1000)
+
+    def screenshot(self) -> str:
+        """Take a screenshot and return it as a base64 string."""
+        screenshot = ImageGrab.grab()
+
+        # Convert to bytes
+        img_byte_arr = io.BytesIO()
+        screenshot.save(img_byte_arr, format='PNG')
+        img_byte_arr = img_byte_arr.getvalue()
+        
+        # Convert to base64
+        base64_data = base64.b64encode(img_byte_arr).decode('utf-8')
+        return base64_data
 
 
 def main():

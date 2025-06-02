@@ -7,5 +7,7 @@ requires-python = ">=3.11"
 dependencies = [
     "evdev>=1.9.2",
     "openai>=1.82.1",
+    "pillow>=11.2.1",
     "pytest>=8.3.5",
+    "requests>=2.32.3",
 ]
