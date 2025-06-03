@@ -1,4 +1,4 @@
-from mpx import MPXEnvironment
+from mpx import WindowMPXEnvironment, select_window
 import os
 import requests
 
@@ -22,8 +22,61 @@ def create_response(**kwargs):
     return response.json()
 
 
+
+def handle_item(item, computer: WindowMPXEnvironment):
+    """Handle each item; may cause a computer action + screenshot."""
+
+    if item["type"] == "message":  # print messages
+        print(item["content"][0]["text"])
+
+    if item["type"] == "computer_call":  # perform computer actions
+        action = item["action"]
+        action_type = action["type"]
+        action_args = {k: v for k, v in action.items() if k != "type"}
+        print(f"{action_type}({action_args})")
+
+        if action_type == "scroll":
+            action_args["scroll_x"] = max(min(action_args["scroll_x"], 5), -5)
+            action_args["scroll_y"] = max(min(action_args["scroll_y"], 5), -5)
+
+        # give our computer environment action to perform
+        getattr(computer, action_type)(**action_args)
+
+        screenshot_base64 = computer.screenshot()
+
+        pending_checks = item.get("pending_safety_checks", [])
+        for check in pending_checks:
+            print("Safety check:", check["message"])
+
+        # return value informs model of the latest screenshot
+        call_output = {
+            "type": "computer_call_output",
+            "call_id": item["call_id"],
+            "acknowledged_safety_checks": pending_checks,
+            "output": {
+                "type": "input_image",
+                "image_url": f"data:image/png;base64,{screenshot_base64}",
+            },
+        }
+
+        return [call_output]
+
+    return []
+
+
 def main():
-    with MPXEnvironment() as computer:
+
+    # Let user select a window
+    window = select_window()
+    if not window:
+        print("No window selected. Exiting.")
+        return
+    
+    print(f"\nSelected window: {window['name']}")
+    print(f"Window ID: {window['id']}")
+    print(f"Size: {window['width']}x{window['height']}")
+
+    with WindowMPXEnvironment(window['id']) as computer:
         """Run the CUA (Computer Use Assistant) loop"""
 
         tools = [
@@ -61,43 +114,6 @@ def main():
 
                 if items[-1].get("role") == "assistant":
                     break
-
-
-def handle_item(item, computer: MPXEnvironment):
-    """Handle each item; may cause a computer action + screenshot."""
-
-    if item["type"] == "message":  # print messages
-        print(item["content"][0]["text"])
-
-    if item["type"] == "computer_call":  # perform computer actions
-        action = item["action"]
-        action_type = action["type"]
-        action_args = {k: v for k, v in action.items() if k != "type"}
-        print(f"{action_type}({action_args})")
-
-        # give our computer environment action to perform
-        getattr(computer, action_type)(**action_args)
-
-        screenshot_base64 = computer.screenshot()
-
-        pending_checks = item.get("pending_safety_checks", [])
-        for check in pending_checks:
-            print("Safety check:", check["message"])
-
-        # return value informs model of the latest screenshot
-        call_output = {
-            "type": "computer_call_output",
-            "call_id": item["call_id"],
-            "acknowledged_safety_checks": pending_checks,
-            "output": {
-                "type": "input_image",
-                "image_url": f"data:image/png;base64,{screenshot_base64}",
-            },
-        }
-
-        return [call_output]
-
-    return []
 
 
 if __name__ == "__main__":

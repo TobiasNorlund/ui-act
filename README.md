@@ -8,5 +8,5 @@ CoX (Copilot for Xorg) is an experimental project that brings a true "copilot" e
 - [X] Script to create a master pointer and attach a uinput device to it
 - [X] Add keyboard support
 - [X] Basic CU agent loop script (full screen)
-- [ ] Single window support
+- [X] Single window support
 - [ ] Beautiful UI (window selection + prompt)
