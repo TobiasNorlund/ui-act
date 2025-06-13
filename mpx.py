@@ -6,8 +6,9 @@ import re
 import base64
 from PIL import Image, ImageGrab
 import io
-from Xlib import X, display
+from Xlib import X, display, Xatom
 from Xlib.error import XError
+from Xlib.protocol import event
 
 
 def get_screen_resolution():
@@ -171,6 +172,44 @@ def get_window_info(window_id):
         raise RuntimeError(f"Could not get window information for window {window_id}")
 
 
+def set_window_always_on_top(window_id: int, always_on_top: bool = True) -> None:
+    """Set a window to be always on top or not using _NET_WM_STATE client message.
+    
+    Args:
+        window_id: The X11 window ID
+        always_on_top: Whether the window should be always on top
+    """
+    d = display.Display()
+    window = d.create_resource_object('window', window_id)
+    root = d.screen().root
+
+    state_atom = d.intern_atom('_NET_WM_STATE')
+    above_atom = d.intern_atom('_NET_WM_STATE_ABOVE')
+
+    if always_on_top:
+        action = 1  # _NET_WM_STATE_ADD
+    else:
+        action = 0  # _NET_WM_STATE_REMOVE
+
+    ev = event.ClientMessage(
+        window=window,
+        client_type=state_atom,
+        data=(
+            32,
+            [
+                action,
+                above_atom,
+                0,  # No second property
+                1,  # Source indication for normal apps
+                0,
+            ],
+        ),
+    )
+    
+    root.send_event(ev, event_mask=X.SubstructureRedirectMask | X.SubstructureNotifyMask)
+    d.sync()
+
+
 class MPXEnvironment:
     def __init__(self):
         self.width, self.height = get_screen_resolution()
@@ -238,12 +277,14 @@ class MPXEnvironment:
         self.mouse_ui.close()
         self.keyboard_ui.close()
 
-        time.sleep(0.5)
+        time.sleep(0.1)
 
         # Remove the MPX master device
+        print("Removing MPX master device")
         result = subprocess.run(['xinput', 'remove-master', str(self.master_mouse_id)])
         if result.returncode != 0:
             raise RuntimeError("Failed to remove MPX master device")
+
 
     def move_to(self, x, y):
         self.mouse_ui.write(e.EV_ABS, e.ABS_X, x)
@@ -459,6 +500,28 @@ class WindowMPXEnvironment(MPXEnvironment):
         # Override width and height with window dimensions
         self.width = self.window_info['width']
         self.height = self.window_info['height']
+        self._was_always_on_top = False
+
+    def __enter__(self):
+        # Store current window state
+        d = display.Display()
+        window = d.create_resource_object('window', self.window_id)
+        states = window.get_full_property(d.intern_atom('_NET_WM_STATE'), Xatom.ATOM)
+        self._was_always_on_top = states and d.intern_atom('_NET_WM_STATE_ABOVE') in states.value
+        
+        # Set window to always on top
+        set_window_always_on_top(self.window_id, True)
+        
+        # Call parent's __enter__
+        return super().__enter__()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # Restore original window state
+        if not self._was_always_on_top:
+            set_window_always_on_top(self.window_id, False)
+        
+        # Call parent's __exit__
+        super().__exit__(exc_type, exc_value, traceback)
 
     def move_to(self, x, y):
         # Convert window-relative coordinates to absolute screen coordinates

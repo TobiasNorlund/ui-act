@@ -12,3 +12,8 @@ dependencies = [
     "python-xlib>=0.33",
     "requests>=2.32.3",
 ]
+
+[dependency-groups]
+dev = [
+    "ipython>=9.3.0",
+]

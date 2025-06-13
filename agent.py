@@ -1,6 +1,7 @@
 from mpx import WindowMPXEnvironment, select_window
 import os
 import requests
+import time
 
 
 def create_response(**kwargs):
@@ -76,44 +77,48 @@ def main():
     print(f"Window ID: {window['id']}")
     print(f"Size: {window['width']}x{window['height']}")
 
-    with WindowMPXEnvironment(window['id']) as computer:
-        """Run the CUA (Computer Use Assistant) loop"""
+    try:
+        with WindowMPXEnvironment(window['id']) as computer:
+            """Run the CUA (Computer Use Assistant) loop"""
 
-        tools = [
-            {
-                "type": "computer-preview",
-                "display_width": computer.width,
-                "display_height": computer.height,
-                "environment": "linux",
-            }
-        ]
+            tools = [
+                {
+                    "type": "computer-preview",
+                    "display_width": computer.width,
+                    "display_height": computer.height,
+                    "environment": "linux",
+                }
+            ]
 
-        print(tools)
+            print(tools)
 
-        items = []
-        while True:  # get user input forever
-            user_input = input("> ")
-            items.append({"role": "user", "content": user_input})
+            items = []
+            while True:  # get user input forever
+                user_input = input("> ")
+                items.append({"role": "user", "content": user_input})
 
-            while True:  # keep looping until we get a final response
-                response = create_response(
-                    model="computer-use-preview",
-                    input=items,
-                    tools=tools,
-                    truncation="auto",
-                )
+                while True:  # keep looping until we get a final response
+                    response = create_response(
+                        model="computer-use-preview",
+                        input=items,
+                        tools=tools,
+                        truncation="auto",
+                    )
 
-                if "output" not in response:
-                    print(response)
-                    raise ValueError("No output from model")
+                    if "output" not in response:
+                        print(response)
+                        raise ValueError("No output from model")
 
-                items += response["output"]
+                    items += response["output"]
 
-                for item in response["output"]:
-                    items += handle_item(item, computer)
+                    for item in response["output"]:
+                        items += handle_item(item, computer)
 
-                if items[-1].get("role") == "assistant":
-                    break
+                    if items[-1].get("role") == "assistant":
+                        break
+    except KeyboardInterrupt:
+        print("\nExiting gracefully...")
+
 
 
 if __name__ == "__main__":

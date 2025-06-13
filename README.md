@@ -9,4 +9,5 @@ CoX (Copilot for Xorg) is an experimental project that brings a true "copilot" e
 - [X] Add keyboard support
 - [X] Basic CU agent loop script (full screen)
 - [X] Single window support
+- [ ] Refactor code for better maintainability
 - [ ] Beautiful UI (window selection + prompt)
