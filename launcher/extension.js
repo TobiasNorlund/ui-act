@@ -40,39 +40,45 @@ const WindowSelectionOverlay = GObject.registerClass(
 class WindowSelectionOverlay extends St.DrawingArea {
     _init() {
         super._init();
-        
-        // Connect the repaint signal
+        this._selectionRect = null; // Store the selected window's rect
         this.connect('repaint', () => this._onRepaint());
-        
-        // Set the size
         this.set_size(global.screen_width, global.screen_height);
+    }
+
+    setSelection(window) {
+        console.log(`setting selection for window: ${window}`);
+        if (window) {
+            const rect = window.get_frame_rect();
+            this._selectionRect = rect;
+            this.queue_repaint();
+        } else {
+            this._selectionRect = null;
+            this.queue_repaint();
+        }
     }
     
     _onRepaint() {
         const cr = this.get_context();
-        
-        // Clear the context
         cr.setSourceRGBA(0, 0, 0, 0);
         cr.setOperator(Cairo.Operator.SOURCE);
         cr.paint();
-        
-        // Set the dark overlay color
+
         cr.setSourceRGBA(0, 0, 0, 0.5);
-        cr.paint();
-        
-        // Create a hole in the center
-        // const holeWidth = 600;
-        // const holeHeight = 250;
-        // const holeX = 100;
-        // const holeY = 100;
-        
-        // // Use XOR to create the hole (subtract the rectangle from the overlay)
-        // cr.setOperator(Cairo.Operator.CLEAR);
-        // cr.rectangle(holeX, holeY, holeWidth, holeHeight);
-        // cr.fill();
-        
-        // Restore the operator
         cr.setOperator(Cairo.Operator.OVER);
+        cr.paint();
+
+        // Draw the hole if a selection is set
+        if (this._selectionRect) {
+            cr.setOperator(Cairo.Operator.CLEAR);
+            cr.rectangle(
+                this._selectionRect.x,
+                this._selectionRect.y,
+                this._selectionRect.width,
+                this._selectionRect.height
+            );
+            cr.fill();
+            cr.setOperator(Cairo.Operator.OVER);
+        }
     }
 });
 
@@ -161,7 +167,7 @@ export default class UIActExtension extends Extension {
         );
 
         // Fullscreen container with BinLayout for manual positioning
-        this.overlay = new St.Widget({
+        this._root = new St.Widget({
             layout_manager: new Clutter.BinLayout(),
             x_expand: true,
             y_expand: true,
@@ -170,11 +176,11 @@ export default class UIActExtension extends Extension {
         });
     
         // Semi-transparent fullscreen background
-        const background = new WindowSelectionOverlay({
+        this._windowSeletionOverlay = new WindowSelectionOverlay({
             reactive: true,
             can_focus: false,
         });
-        this.overlay.add_child(background);
+        this._root.add_child(this._windowSeletionOverlay);
     
         // Foreground white rounded box
         this._launcherUI = new LauncherUI(this);
@@ -183,12 +189,12 @@ export default class UIActExtension extends Extension {
         });
     
         // Position in center of screen
-        this.overlay.add_child(this._launcherUI);
+        this._root.add_child(this._launcherUI);
         this._launcherUI.set_x_align(Clutter.ActorAlign.CENTER);
         this._launcherUI.set_y_align(Clutter.ActorAlign.MIDDLE);
     
         // Add the whole thing as chrome
-        Main.layoutManager.addChrome(this.overlay);
+        Main.layoutManager.addChrome(this._root);
 
         // Create the button and add it to the top panel
         this._indicator = new ScreenshotButton(this);
@@ -211,22 +217,31 @@ export default class UIActExtension extends Extension {
         }
 
         // Destroy the overlay and its child container
-        if (this.overlay) {
-            this.overlay.destroy();
-            this.overlay = null;
+        if (this._root) {
+            this._root.destroy();
+            this._root = null;
         }
     }
 
     show() {
+        if (this._root.visible)
+            return;
+
         console.log("Showing UI Act launcher");
-        this.overlay.visible = true;
-        Main.pushModal(this.overlay);
+        this._root.visible = true;
+        this._modal_grab = Main.pushModal(this._root);
+
+        // Update selected window in background
+        const workspace = global.workspace_manager.get_active_workspace();
+        const stackedWindows = global.display.get_tab_list(Meta.TabList.NORMAL_ALL, workspace);
+        const firstWindow = stackedWindows.length > 0 ? stackedWindows[0] : null;
+        this._windowSeletionOverlay.setSelection(firstWindow);
 
         // Add key event handler for Escape
-        if (!this._keyPressEventId) {
-            this._keyPressEventId = this.overlay.connect('key-press-event', (actor, event) => {
+        if (!this._keyPressEventHandler) {
+            this._keyPressEventHandler = this._root.connect('key-press-event', (actor, event) => {
                 let symbol = event.get_key_symbol();
-                if (symbol === Clutter.KEY_Escape && this.overlay.visible) {
+                if (symbol === Clutter.KEY_Escape && this._root.visible) {
                     this.hide();
                     return Clutter.EVENT_STOP;
                 }
@@ -242,13 +257,13 @@ export default class UIActExtension extends Extension {
 
     hide() {
         console.log("Hiding UI Act launcher");
-        this.overlay.visible = false;
-        Main.popModal(this.overlay);
+        this._root.visible = false;
+        Main.popModal(this._modal_grab);
 
         // Disconnect key event handler
-        if (this._keyPressEventId) {
-            this.overlay.disconnect(this._keyPressEventId);
-            this._keyPressEventId = null;
+        if (this._keyPressEventHandler) {
+            this._root.disconnect(this._keyPressEventHandler);
+            this._keyPressEventHandler = null;
         }
 
         // let workspace = global.workspace_manager.get_active_workspace();
