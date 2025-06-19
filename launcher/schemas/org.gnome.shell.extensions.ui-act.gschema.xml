@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.ui-act" path="/org/gnome/shell/extensions/ui-act/">
+    <key name="ui-act-launch" type="as">
+      <default><![CDATA[['<Super>space']]]></default>
+      <summary>Launch UI Act</summary>
+      <description>Set the keyboard shortcut for launching UI Act.</description>
+    </key>
+  </schema>
+</schemalist>

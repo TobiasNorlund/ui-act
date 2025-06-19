@@ -15,6 +15,7 @@ import Cairo from 'gi://cairo';
 import Clutter from 'gi://Clutter';
 import Meta from 'gi://Meta';
 import Gio from 'gi://Gio';
+import Shell from 'gi://Shell';
 
 
 const ScreenshotButton = GObject.registerClass(
@@ -31,7 +32,7 @@ class ScreenshotButton extends PanelMenu.Button {
         }));
 
         // Connect the click event
-        this.connect('button-press-event', () => this._extension.toggleOverlay());
+        //this.connect('button-press-event', () => this._extension.toggleOverlay());
     }
 });
 
@@ -80,6 +81,17 @@ export default class UIActExtension extends Extension {
     enable() {
         console.log('Enabling Screenshot Overlay Extension');
 
+        // Register Super+space keybinding
+        this._settings = this.getSettings("org.gnome.shell.extensions.ui-act");
+        this._launchKeybindingKey = 'ui-act-launch';
+        Main.wm.addKeybinding(
+            this._launchKeybindingKey,
+            this._settings,
+            Meta.KeyBindingFlags.NONE,
+            Shell.ActionMode.NORMAL,
+            () => this.toggleOverlay()
+        );
+
         // Fullscreen container with BinLayout for manual positioning
         this.overlay = new St.Widget({
             layout_manager: new Clutter.BinLayout(),
@@ -120,6 +132,12 @@ export default class UIActExtension extends Extension {
 
     disable() {
         console.log('Disabling Screenshot Overlay Extension');
+
+        // Remove the keybinding
+        if (this._launchKeybindingKey) {
+            Main.wm.removeKeybinding(this._launchKeybindingKey);
+            this._settings = null;
+        }
 
         // Remove the indicator from the panel
         if (this._indicator) {
