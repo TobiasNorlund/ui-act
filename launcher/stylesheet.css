@@ -1,0 +1,13 @@
+/*
+ * stylesheet.css
+ *
+ */
+
+
+.launch-container {
+    background-color: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 60px 0 rgba(0, 0, 0, 0.25);
+    border-radius: 15px;
+    width: 600px;
+    height: 250px;
+}
