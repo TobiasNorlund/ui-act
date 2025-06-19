@@ -21,12 +21,11 @@ import Shell from 'gi://Shell';
 const ScreenshotButton = GObject.registerClass(
 class ScreenshotButton extends PanelMenu.Button {
     _init(extension) {
-        super._init(0.0, 'Screenshot Overlay');
-        this._extension = extension;
+        super._init(0.0, 'UI Act');
 
         // Add an icon to the button
         this.add_child(new St.Icon({
-            gicon: Gio.icon_new_for_string(this._extension.path + '/assets/uiact_wb.svg'),
+            gicon: Gio.icon_new_for_string(extension.path + '/images/uiact_wb.svg'),
             icon_size: 32,
             style_class: 'system-status-icon'
         }));
@@ -77,9 +76,70 @@ class WindowSelectionOverlay extends St.DrawingArea {
 });
 
 
+const LauncherUI = GObject.registerClass({
+    // We can define signals for our widget.
+    // This lets other parts of the code know when the close button was clicked.
+    Signals: {
+        'closed': {},
+    },
+},
+class LauncherUI extends St.BoxLayout {
+    _init(extension, ...params) {
+        super._init({
+            ...params,
+            style_class: 'launch-container',
+            vertical: true, // Arrange children top-to-bottom
+        });
+
+        // --- Close Button ---
+        let topBar = new St.BoxLayout();
+        const svgPath = extension.path + '/images/uiact_gw.svg';
+        const svgFile = Gio.File.new_for_path(svgPath);
+        const svgIcon = new St.Icon({
+            style_class: 'ui-act-icon',
+            gicon: new Gio.FileIcon({ file: svgFile }),
+        });
+        let spacer = new St.Widget({ x_expand: true });
+        let closeButton = new St.Button({
+            style_class: 'close-button',
+            y_align: Clutter.ActorAlign.START,
+            child: new St.Icon({
+                icon_name: 'window-close-symbolic',
+                style_class: 'popup-menu-icon',
+            }),
+        });
+        closeButton.connect('clicked', () => {
+            this.emit('closed');
+        });
+        topBar.add_child(svgIcon);
+        topBar.add_child(spacer);
+        topBar.add_child(closeButton);
+        this.add_child(topBar);
+
+        // Store reference to promptInput
+        this.promptInput = new St.Entry({
+            style_class: 'prompt-input',
+            hint_text: 'Describe a task',
+            can_focus: true,
+            x_expand: true, // Allows it to fill the width of contentBox
+        });
+        this.add_child(this.promptInput);
+
+        let contentLabel = new St.Label({
+            text: 'This is the main content area.',
+            style_class: 'content-label',
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.CENTER,
+            y_expand: true,
+        });
+        this.add_child(contentLabel);
+    }
+});
+
+
 export default class UIActExtension extends Extension {
     enable() {
-        console.log('Enabling Screenshot Overlay Extension');
+        console.log('Enabling UI Act Extension');
 
         // Register Super+space keybinding
         this._settings = this.getSettings("org.gnome.shell.extensions.ui-act");
@@ -89,7 +149,7 @@ export default class UIActExtension extends Extension {
             this._settings,
             Meta.KeyBindingFlags.NONE,
             Shell.ActionMode.NORMAL,
-            () => this.toggleOverlay()
+            () => this.show()
         );
 
         // Fullscreen container with BinLayout for manual positioning
@@ -109,12 +169,11 @@ export default class UIActExtension extends Extension {
         this.overlay.add_child(background);
     
         // Foreground white rounded box
-        let launchContainer = new St.BoxLayout({
-            style_class: 'launch-container',
-            vertical: true,
-            reactive: true,
-            x_expand: false,
-            y_expand: false,
+        let launchContainer = new LauncherUI(this);
+        this._launchContainer = launchContainer;
+        // Connect to the 'closed' signal to handle the event
+        launchContainer.connect('closed', () => {
+            this.hide();
         });
     
         // Position in center of screen
@@ -131,7 +190,7 @@ export default class UIActExtension extends Extension {
     }
 
     disable() {
-        console.log('Disabling Screenshot Overlay Extension');
+        console.log('Disabling UI Act Extension');
 
         // Remove the keybinding
         if (this._launchKeybindingKey) {
@@ -152,9 +211,37 @@ export default class UIActExtension extends Extension {
         }
     }
 
-    toggleOverlay() {
-        console.log(`Toggle visibility to ${!this.overlay.visible}`);
-        this.overlay.visible = !this.overlay.visible;
+    show() {
+        console.log("Showing UI Act launcher");
+        this.overlay.visible = true;
+
+        // Add key event handler for Escape
+        if (!this._keyPressEventId) {
+            this._keyPressEventId = global.stage.connect('key-press-event', (actor, event) => {
+                let symbol = event.get_key_symbol();
+                if (symbol === Clutter.KEY_Escape && this.overlay.visible) {
+                    this.hide();
+                    return Clutter.EVENT_STOP;
+                }
+                return Clutter.EVENT_PROPAGATE;
+            });
+        }
+
+        // Focus the prompt input
+        if (this._launchContainer && this._launchContainer.promptInput) {
+            this._launchContainer.promptInput.grab_key_focus();
+        }
+    }
+
+    hide() {
+        console.log("Hiding UI Act launcher");
+        this.overlay.visible = false;
+
+        // Disconnect key event handler
+        if (this._keyPressEventId) {
+            global.stage.disconnect(this._keyPressEventId);
+            this._keyPressEventId = null;
+        }
 
         // let workspace = global.workspace_manager.get_active_workspace();
         // let stackedWindows = global.display.get_tab_list(Meta.TabList.NORMAL_ALL, workspace);

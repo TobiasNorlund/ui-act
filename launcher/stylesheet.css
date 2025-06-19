@@ -3,6 +3,12 @@
  *
  */
 
+ @font-face {
+    font-family: 'Roboto';
+    src: url('fonts/Roboto-Regular.ttf');
+    font-weight: normal;
+    font-style: normal;
+}
 
 .launch-container {
     background-color: rgba(255, 255, 255, 0.9);
@@ -10,4 +16,56 @@
     border-radius: 15px;
     width: 600px;
     height: 250px;
+    padding: 10px;
+}
+
+.close-button {
+    border-radius: 99px; /* Make it a circle */
+    background-color: transparent;
+    color: #505050; /* Icon color */
+    border: none;
+    box-shadow: none;
+}
+
+.close-button > StIcon {
+    icon-size: 1.5em; /* Increase the size. You can use px or em. */
+}
+
+.close-button:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+    color: #2e2e2e;
+}
+
+.close-button:active {
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+/* A simple style for the example content label */
+.content-label {
+    font-size: 1.5em;
+    color: #333;
+}
+
+.ui-act-icon {
+    icon-size: 80px;
+    height: 33px;
+    width: auto;
+    margin: 5px;
+}
+
+.prompt-input {
+    margin: 20px 5px 5px 5px;
+    background-color: transparent;
+    font-family: 'Roboto';
+    font-size: 24px;
+    padding: 0;
+    border: none;
+}
+
+.prompt-input:focus {
+    border: none;
+}
+
+.prompt-input > StLabel {
+    color: #c0c0c0;
 }
