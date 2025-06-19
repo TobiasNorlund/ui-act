@@ -220,10 +220,11 @@ export default class UIActExtension extends Extension {
     show() {
         console.log("Showing UI Act launcher");
         this.overlay.visible = true;
+        Main.pushModal(this.overlay);
 
         // Add key event handler for Escape
         if (!this._keyPressEventId) {
-            this._keyPressEventId = global.stage.connect('key-press-event', (actor, event) => {
+            this._keyPressEventId = this.overlay.connect('key-press-event', (actor, event) => {
                 let symbol = event.get_key_symbol();
                 if (symbol === Clutter.KEY_Escape && this.overlay.visible) {
                     this.hide();
@@ -242,10 +243,11 @@ export default class UIActExtension extends Extension {
     hide() {
         console.log("Hiding UI Act launcher");
         this.overlay.visible = false;
+        Main.popModal(this.overlay);
 
         // Disconnect key event handler
         if (this._keyPressEventId) {
-            global.stage.disconnect(this._keyPressEventId);
+            this.overlay.disconnect(this._keyPressEventId);
             this._keyPressEventId = null;
         }
 
