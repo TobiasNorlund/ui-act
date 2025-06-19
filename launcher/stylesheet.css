@@ -10,6 +10,15 @@
     font-style: normal;
 }
 
+@font-face {
+    font-family: 'Inter';
+    src: url('Inter-VariableFont_opsz,wght.ttf') format('truetype');
+    font-weight: 100 900;
+    font-style: normal;
+    font-optical-sizing: auto; /* Automatically uses the 'opsz' axis based on text size */
+  }
+
+
 .launch-container {
     background-color: rgba(255, 255, 255, 0.9);
     box-shadow: 0 0 60px 0 rgba(0, 0, 0, 0.25);
@@ -20,15 +29,15 @@
 }
 
 .close-button {
-    border-radius: 99px; /* Make it a circle */
+    border-radius: 99px;
     background-color: transparent;
-    color: #505050; /* Icon color */
+    color: #505050;
     border: none;
     box-shadow: none;
 }
 
 .close-button > StIcon {
-    icon-size: 1.5em; /* Increase the size. You can use px or em. */
+    icon-size: 1.5em;
 }
 
 .close-button:hover {
@@ -68,4 +77,26 @@
 
 .prompt-input > StLabel {
     color: #c0c0c0;
+}
+
+.run-button {
+    width: 48px;
+    height: 48px;
+    border: 2px solid #c5c5c5;
+    border-radius: 99px;
+    margin: 5px;
+    color: #676767; /* Icon color */
+    padding-left: 2px;
+}
+
+.run-button > StIcon {
+    icon-size: 20px;
+}
+
+.run-button:hover {
+    border-color: #999999;
+}
+
+.run-button:active {
+    background-color: #c5c5c5;
 }

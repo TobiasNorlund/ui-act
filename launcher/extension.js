@@ -8,6 +8,7 @@
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
+import { PopupMenu, PopupMenuItem} from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import St from 'gi://St';
 import GObject from 'gi://GObject';
 import GLib from 'gi://GLib';
@@ -91,7 +92,6 @@ class LauncherUI extends St.BoxLayout {
             vertical: true, // Arrange children top-to-bottom
         });
 
-        // --- Close Button ---
         let topBar = new St.BoxLayout();
         const svgPath = extension.path + '/images/uiact_gw.svg';
         const svgFile = Gio.File.new_for_path(svgPath);
@@ -99,7 +99,6 @@ class LauncherUI extends St.BoxLayout {
             style_class: 'ui-act-icon',
             gicon: new Gio.FileIcon({ file: svgFile }),
         });
-        let spacer = new St.Widget({ x_expand: true });
         let closeButton = new St.Button({
             style_class: 'close-button',
             y_align: Clutter.ActorAlign.START,
@@ -112,27 +111,36 @@ class LauncherUI extends St.BoxLayout {
             this.emit('closed');
         });
         topBar.add_child(svgIcon);
-        topBar.add_child(spacer);
+        topBar.add_child(new St.Widget({ x_expand: true })); // Spacer
         topBar.add_child(closeButton);
         this.add_child(topBar);
 
-        // Store reference to promptInput
         this.promptInput = new St.Entry({
             style_class: 'prompt-input',
             hint_text: 'Describe a task',
             can_focus: true,
-            x_expand: true, // Allows it to fill the width of contentBox
+            x_expand: true,
         });
         this.add_child(this.promptInput);
+        this.add_child(new St.Widget({ y_expand: true })); // Spacer
 
-        let contentLabel = new St.Label({
-            text: 'This is the main content area.',
-            style_class: 'content-label',
-            x_align: Clutter.ActorAlign.CENTER,
-            y_align: Clutter.ActorAlign.CENTER,
-            y_expand: true,
+        const bottomBar = new St.BoxLayout();
+        bottomBar.add_child(new St.Widget({ x_expand: true }));
+
+        // Create the play button
+        const runButton = new St.Button({
+            style_class: 'run-button',
+            //x_align: Clutter.ActorAlign.END,
+            child: new St.Icon({
+                icon_name: 'media-playback-start-symbolic',
+                style_class: 'popup-menu-icon',
+            }),
         });
-        this.add_child(contentLabel);
+        bottomBar.add_child(runButton);
+
+        // Add the bottom bar to the main container
+        this.add_child(bottomBar);
+
     }
 });
 
@@ -157,29 +165,27 @@ export default class UIActExtension extends Extension {
             layout_manager: new Clutter.BinLayout(),
             x_expand: true,
             y_expand: true,
-            reactive: false,
+            reactive: true,
             visible: false
         });
     
         // Semi-transparent fullscreen background
-        let background = new WindowSelectionOverlay({
-            reactive: false,
+        const background = new WindowSelectionOverlay({
+            reactive: true,
             can_focus: false,
         });
         this.overlay.add_child(background);
     
         // Foreground white rounded box
-        let launchContainer = new LauncherUI(this);
-        this._launchContainer = launchContainer;
-        // Connect to the 'closed' signal to handle the event
-        launchContainer.connect('closed', () => {
+        this._launcherUI = new LauncherUI(this);
+        this._launcherUI.connect('closed', () => {
             this.hide();
         });
     
         // Position in center of screen
-        this.overlay.add_child(launchContainer);
-        launchContainer.set_x_align(Clutter.ActorAlign.CENTER);
-        launchContainer.set_y_align(Clutter.ActorAlign.MIDDLE);
+        this.overlay.add_child(this._launcherUI);
+        this._launcherUI.set_x_align(Clutter.ActorAlign.CENTER);
+        this._launcherUI.set_y_align(Clutter.ActorAlign.MIDDLE);
     
         // Add the whole thing as chrome
         Main.layoutManager.addChrome(this.overlay);
@@ -228,8 +234,8 @@ export default class UIActExtension extends Extension {
         }
 
         // Focus the prompt input
-        if (this._launchContainer && this._launchContainer.promptInput) {
-            this._launchContainer.promptInput.grab_key_focus();
+        if (this._launcherUI && this._launcherUI.promptInput) {
+            this._launcherUI.promptInput.grab_key_focus();
         }
     }
 
