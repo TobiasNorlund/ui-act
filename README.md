@@ -1,22 +1,11 @@
-#  CoX (Copilot for Xorg)
+# UI Act
 
-CoX (Copilot for Xorg) is an experimental project that brings a true "copilot" experience to your Linux desktop by leveraging the MPX (Multi-Pointer X) feature of the Xorg window system. CoX enables Computer Use agents to run alongside you, interacting with your desktop as independent users—moving their own cursors, clicking, typing, and automating tasks in real time, right next to you.
+UI Act is a Linux desktop (aka computer using) agent that can perform tasks just like you would do them - by interacting live with your desktop GUI.
 
-## Setup
+UI Act can work along side you using its own separate mouse and keyboard. It uses Multi-Pointer X (MPX), supported by the X windowing system, to interact with open windows on your desktop. This allows for a _true_ copilot experience where you and your agent can work side-by-side to get things done:
 
-Add this to `/etc/udev/rules.d/99-uinput.rules`:
-```
-KERNEL=="uinput", MODE="0660", GROUP="input"
-```
-Then reload:
-```bash
-sudo udevadm control --reload-rules
-sudo udevadm trigger
-```
+[TBA: Demo video]
 
-Then add your user to `input` group:
+## 🚧 WIP
 
-```bash
-sudo usermod -aG input $USER
-newgrp input
-```
+This project is under active development. If this sounds interesting and you would like to help out, please reach out to tobias@norlund.se
