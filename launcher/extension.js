@@ -155,6 +155,9 @@ export default class UIActExtension extends Extension {
     enable() {
         console.log('Enabling UI Act Extension');
 
+        // Init
+        this._modal_grab = null;
+
         // Register Super+space keybinding
         this._settings = this.getSettings("org.gnome.shell.extensions.ui-act");
         this._launchKeybindingKey = 'ui-act-launch';
@@ -258,7 +261,8 @@ export default class UIActExtension extends Extension {
     hide() {
         console.log("Hiding UI Act launcher");
         this._root.visible = false;
-        Main.popModal(this._modal_grab);
+        if (this._modal_grab)
+            Main.popModal(this._modal_grab);
 
         // Disconnect key event handler
         if (this._keyPressEventHandler) {

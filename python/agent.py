@@ -116,6 +116,7 @@ def main():
 
                     if items[-1].get("role") == "assistant":
                         break
+                        
     except KeyboardInterrupt:
         print("\nExiting gracefully...")
 
