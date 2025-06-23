@@ -1,0 +1,10 @@
+[package]
+name = "ui_act"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+uinput = "0.1.3"
+anyhow = "1.0"
+thiserror = "1.0"
+ctrlc = "3.2"
