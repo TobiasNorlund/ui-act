@@ -64,6 +64,42 @@ impl MouseDevice {
         self.device.synchronize()?;
         Ok(())
     }
+
+    fn right_click(&mut self) -> Result<()> {
+        self.device
+            .send(uinput::event::controller::Controller::Mouse(uinput::event::controller::Mouse::Right), 1)?;
+        self.device.synchronize()?;
+        thread::sleep(Duration::from_millis(100));
+        self.device
+            .send(uinput::event::controller::Controller::Mouse(uinput::event::controller::Mouse::Right), 0)?;
+        self.device.synchronize()?;
+        Ok(())
+    }
+
+    fn double_click(&mut self) -> Result<()> {
+        // First click
+        self.device
+            .send(uinput::event::controller::Controller::Mouse(uinput::event::controller::Mouse::Left), 1)?;
+        self.device.synchronize()?;
+        thread::sleep(Duration::from_millis(50));
+        self.device
+            .send(uinput::event::controller::Controller::Mouse(uinput::event::controller::Mouse::Left), 0)?;
+        self.device.synchronize()?;
+        
+        // Small delay between clicks for double-click recognition
+        thread::sleep(Duration::from_millis(50));
+        
+        // Second click
+        self.device
+            .send(uinput::event::controller::Controller::Mouse(uinput::event::controller::Mouse::Left), 1)?;
+        self.device.synchronize()?;
+        thread::sleep(Duration::from_millis(50));
+        self.device
+            .send(uinput::event::controller::Controller::Mouse(uinput::event::controller::Mouse::Left), 0)?;
+        self.device.synchronize()?;
+        
+        Ok(())
+    }
 }
 
 struct KeyboardDevice {
@@ -82,6 +118,19 @@ impl KeyboardDevice {
             uinput::event::keyboard::Key::U, uinput::event::keyboard::Key::V, uinput::event::keyboard::Key::W, uinput::event::keyboard::Key::X, uinput::event::keyboard::Key::Y, uinput::event::keyboard::Key::Z,
             uinput::event::keyboard::Key::_1, uinput::event::keyboard::Key::_2, uinput::event::keyboard::Key::_3, uinput::event::keyboard::Key::_4, uinput::event::keyboard::Key::_5, uinput::event::keyboard::Key::_6, uinput::event::keyboard::Key::_7, uinput::event::keyboard::Key::_8, uinput::event::keyboard::Key::_9, uinput::event::keyboard::Key::_0,
             uinput::event::keyboard::Key::Space, uinput::event::keyboard::Key::Dot, uinput::event::keyboard::Key::Comma,
+            uinput::event::keyboard::Key::LeftControl, uinput::event::keyboard::Key::RightControl,
+            uinput::event::keyboard::Key::LeftAlt, uinput::event::keyboard::Key::RightAlt,
+            uinput::event::keyboard::Key::LeftShift, uinput::event::keyboard::Key::RightShift,
+            uinput::event::keyboard::Key::LeftMeta, uinput::event::keyboard::Key::RightMeta,
+            uinput::event::keyboard::Key::Tab, uinput::event::keyboard::Key::Enter, uinput::event::keyboard::Key::Esc,
+            uinput::event::keyboard::Key::BackSpace, uinput::event::keyboard::Key::Delete,
+            uinput::event::keyboard::Key::Home, uinput::event::keyboard::Key::End,
+            uinput::event::keyboard::Key::PageUp, uinput::event::keyboard::Key::PageDown,
+            uinput::event::keyboard::Key::Insert,
+            uinput::event::keyboard::Key::F1, uinput::event::keyboard::Key::F2, uinput::event::keyboard::Key::F3,
+            uinput::event::keyboard::Key::F4, uinput::event::keyboard::Key::F5, uinput::event::keyboard::Key::F6,
+            uinput::event::keyboard::Key::F7, uinput::event::keyboard::Key::F8, uinput::event::keyboard::Key::F9,
+            uinput::event::keyboard::Key::F10, uinput::event::keyboard::Key::F11, uinput::event::keyboard::Key::F12,
         ] {
             builder = builder.event(key)?;
         }
@@ -109,8 +158,78 @@ impl KeyboardDevice {
         }
         Ok(())
     }
+
+    fn press_key(&mut self, key_combination: &str) -> Result<()> {
+        let keys = parse_key_combination(key_combination)?;
+        
+        // Press all keys in sequence
+        for key in &keys.keys {
+            self.device.send(*key, 1)?;
+            self.device.synchronize()?;
+        }
+        thread::sleep(Duration::from_millis(50));
+        
+        // Release all keys in reverse sequence
+        for key in keys.keys.iter().rev() {
+            self.device.send(*key, 0)?;
+            self.device.synchronize()?;
+        }
+        
+        Ok(())
+    }
 }
 
+struct KeyCombination {
+    keys: Vec<uinput::event::keyboard::Key>,
+}
+
+fn parse_key_combination(combination: &str) -> Result<KeyCombination> {
+    use uinput::event::keyboard::Key;
+    
+    let parts: Vec<&str> = combination.split('+').collect();
+    let mut keys = Vec::new();
+    
+    for part in parts {
+        let key = match part.to_lowercase().as_str() {
+            "ctrl" | "control" => Key::LeftControl,
+            "alt" => Key::LeftAlt,
+            "shift" => Key::LeftShift,
+            "meta" | "win" | "super" => Key::LeftMeta,
+            "c" => Key::C,
+            "v" => Key::V,
+            "x" => Key::X,
+            "z" => Key::Z,
+            "a" => Key::A,
+            "f" => Key::F,
+            "f1" => Key::F1,
+            "f2" => Key::F2,
+            "f3" => Key::F3,
+            "f4" => Key::F4,
+            "f5" => Key::F5,
+            "f6" => Key::F6,
+            "f7" => Key::F7,
+            "f8" => Key::F8,
+            "f9" => Key::F9,
+            "f10" => Key::F10,
+            "f11" => Key::F11,
+            "f12" => Key::F12,
+            "tab" => Key::Tab,
+            "enter" | "return" => Key::Enter,
+            "escape" | "esc" => Key::Esc,
+            "backspace" => Key::BackSpace,
+            "delete" | "del" => Key::Delete,
+            "home" => Key::Home,
+            "end" => Key::End,
+            "pageup" => Key::PageUp,
+            "pagedown" => Key::PageDown,
+            "insert" => Key::Insert,
+            _ => return Err(anyhow!("Unknown key: {}", part)),
+        };
+        keys.push(key);
+    }
+    
+    Ok(KeyCombination { keys })
+}
 
 fn get_device_id_by_name(name: &str) -> Result<i32> {
     let output = Command::new("xinput").arg("list").output()?;
@@ -244,12 +363,26 @@ fn main() -> Result<()> {
             "left_click" => {
                 mouse.left_click()?;
             }
+            "right_click" => {
+                mouse.right_click()?;
+            }
+            "double_click" => {
+                mouse.double_click()?;
+            }
             "type" => {
                 if parts.len() > 1 {
                     let text = parts[1..].join(" ");
                     keyboard.type_text(&text)?;
                 } else {
                     eprintln!("Usage: type <text>");
+                }
+            }
+            "key" => {
+                if parts.len() == 2 {
+                    keyboard.press_key(parts[1])?;
+                } else {
+                    eprintln!("Usage: key <key_combination>");
+                    eprintln!("Examples: key ctrl+c, key alt+tab, key ctrl+alt+delete");
                 }
             }
             "exit" => {
