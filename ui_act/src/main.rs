@@ -6,6 +6,8 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 use thiserror::Error;
+use xcap::Monitor;
+//use image::ImageEncoder;
 
 #[derive(Error, Debug)]
 enum DeviceError {
@@ -179,6 +181,50 @@ impl KeyboardDevice {
     }
 }
 
+struct MPXEnvironment {
+    master: XInputMaster,
+    mouse: MouseDevice,
+    keyboard: KeyboardDevice,
+}
+
+impl MPXEnvironment {
+    fn create() -> Result<Self> {
+        // TODO: Should not hardcode resolution here
+        let mouse = MouseDevice::create("ui-act-mouse", 1920, 1080)?;
+        let keyboard = KeyboardDevice::create("ui-act-keyboard")?;
+        println!("Created virtual mouse and keyboard");
+    
+        let master = XInputMaster::create("UI Act")?;
+        println!("Created master device pair: {} (pointer id={} keyboard id={})", master.name, master.pointer_id, master.keyboard_id);
+    
+        let mouse_id = get_device_id_by_name(&mouse.name)?;
+        run_xinput(&["reattach", &mouse_id.to_string(), &master.pointer_id.to_string()])?;
+        println!("Attached {} (id={}) to {} (id={})", mouse.name, mouse_id, master.name, master.pointer_id);
+    
+        let keyboard_id = get_device_id_by_name(&keyboard.name)?;
+        run_xinput(&["reattach", &keyboard_id.to_string(), &master.keyboard_id.to_string()])?;
+        println!("Attached {} (id={}) to {} (id={})", keyboard.name, keyboard_id, master.name, master.keyboard_id);
+    
+        Ok(MPXEnvironment { master, mouse, keyboard })
+    }
+
+    fn screenshot(&self) -> Result<()> {
+        // Take a screenshot of the first monitor and return PNG bytes
+        let monitor = xcap::Monitor::all()
+            .map_err(|e| anyhow!("Failed to enumerate monitors: {}", e))?
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow!("No monitors found"))?;
+
+        let image = monitor.capture_image()
+            .map_err(|e| anyhow!("Failed to capture monitor: {}", e))?;
+
+        image.save("screenshot.png")?;
+        Ok(())
+    }
+
+}
+
 struct KeyCombination {
     keys: Vec<uinput::event::keyboard::Key>,
 }
@@ -299,27 +345,8 @@ fn run_xinput(args: &[&str]) -> Result<()> {
     Ok(())
 }
 
-fn setup_devices() -> Result<(XInputMaster, MouseDevice, KeyboardDevice)> {
-    let mouse = MouseDevice::create("ui-act-mouse", 1920, 1080)?;
-    let keyboard = KeyboardDevice::create("ui-act-keyboard")?;
-    println!("Created virtual mouse and keyboard");
-
-    let master_device = XInputMaster::create("UI Act")?;
-    println!("Created master device pair: {} (pointer id={} keyboard id={})", master_device.name, master_device.pointer_id, master_device.keyboard_id);
-
-    let mouse_id = get_device_id_by_name(&mouse.name)?;
-    run_xinput(&["reattach", &mouse_id.to_string(), &master_device.pointer_id.to_string()])?;
-    println!("Attached {} (id={}) to {} (id={})", mouse.name, mouse_id, master_device.name, master_device.pointer_id);
-
-    let keyboard_id = get_device_id_by_name(&keyboard.name)?;
-    run_xinput(&["reattach", &keyboard_id.to_string(), &master_device.keyboard_id.to_string()])?;
-    println!("Attached {} (id={}) to {} (id={})", keyboard.name, keyboard_id, master_device.name, master_device.keyboard_id);
-
-    Ok((master_device, mouse, keyboard))
-}
-
 fn main() -> Result<()> {
-    let (_master_device, mut mouse, mut keyboard) = setup_devices()?;
+    let mut env = MPXEnvironment::create()?;
 
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
@@ -352,7 +379,7 @@ fn main() -> Result<()> {
             "mouse_move" => {
                 if parts.len() == 3 {
                     if let (Ok(x), Ok(y)) = (parts[1].parse(), parts[2].parse()) {
-                        mouse.mouse_move(x, y)?;
+                        env.mouse.mouse_move(x, y)?;
                     } else {
                         eprintln!("Invalid arguments for mouse_move. Expected x y coordinates.");
                     }
@@ -361,29 +388,32 @@ fn main() -> Result<()> {
                 }
             }
             "left_click" => {
-                mouse.left_click()?;
+                env.mouse.left_click()?;
             }
             "right_click" => {
-                mouse.right_click()?;
+                env.mouse.right_click()?;
             }
             "double_click" => {
-                mouse.double_click()?;
+                env.mouse.double_click()?;
             }
             "type" => {
                 if parts.len() > 1 {
                     let text = parts[1..].join(" ");
-                    keyboard.type_text(&text)?;
+                    env.keyboard.type_text(&text)?;
                 } else {
                     eprintln!("Usage: type <text>");
                 }
             }
             "key" => {
                 if parts.len() == 2 {
-                    keyboard.press_key(parts[1])?;
+                    env.keyboard.press_key(parts[1])?;
                 } else {
                     eprintln!("Usage: key <key_combination>");
                     eprintln!("Examples: key ctrl+c, key alt+tab, key ctrl+alt+delete");
                 }
+            }
+            "screenshot" => {
+                let _ = env.screenshot();
             }
             "exit" => {
                 break;
