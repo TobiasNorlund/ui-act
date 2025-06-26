@@ -14,3 +14,4 @@ reqwest = { version = "0.12", features = ["blocking", "json"] }
 serde_json = "1.0.140"
 base64 = "0.22.1"
 serde = { version = "1.0.219", features = ["derive"] }
+tokio = { version = "1.45.1", features = ["full"] }

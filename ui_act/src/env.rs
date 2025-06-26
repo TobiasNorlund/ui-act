@@ -267,9 +267,6 @@ fn get_device_id_by_name(name: &str) -> Result<i32> {
     }
     Err(anyhow!("Device '{}' not found in xinput list", name))
 }
-
-
-
 struct XInputMaster {
     name: String,
     pointer_id: i32,
