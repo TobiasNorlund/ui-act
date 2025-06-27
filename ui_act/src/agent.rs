@@ -1,9 +1,8 @@
 use anyhow::Result;
 use serde_json::json;
-use std::io::{self, Write, Cursor};
+use std::io::{self, Cursor};
 use base64::{Engine as _, engine::general_purpose};
 use serde::{Serialize, Deserialize};
-use reqwest::Client;
 use tokio::io::{AsyncWriteExt, AsyncBufReadExt, BufReader};
 
 use crate::env::MPXEnvironment;
@@ -16,7 +15,7 @@ struct ApiResponse {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct Message {
+pub struct Message {
     role: String,
     content: Vec<ContentBlock>
 }
@@ -102,7 +101,7 @@ impl AnthropicAgent {
         let stdin = BufReader::new(tokio::io::stdin());
         let mut lines = stdin.lines();
 
-        for _ in 0..5 {
+        loop {
             let resp = self.get_response(
                 screenshot.width(),
                 screenshot.height(),
