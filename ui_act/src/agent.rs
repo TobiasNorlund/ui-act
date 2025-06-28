@@ -55,7 +55,7 @@ pub enum ToolInput {
     #[serde(rename = "type")]
     Type { text: String },
     #[serde(rename = "key")]
-    Key { key: String }
+    Key { text: String }
     // TODO: Fill out
 }
 
@@ -85,9 +85,9 @@ impl AnthropicAgent {
         Ok(AnthropicAgent {client, api_key})
     }
 
-    pub async fn run<T: ComputerEnvironment>(&self, mut env: T, prompt: &str) -> Result<()> {
+    pub async fn run(&self, mut env: Box<dyn ComputerEnvironment>, prompt: &str) -> Result<()> {
         let mut screenshot = img_shrink(env.screenshot()?, ANTHROPIC_MAX_WIDTH, ANTHROPIC_MAX_HEIGHT);
-        let mut scale: f32 = screenshot.width() as f32 / env.width() as f32; // Scale relative environment
+        let mut scale: f32 = screenshot.width() as f32 / env.width()? as f32; // Scale relative environment
         let mut messages: Vec<Message> = vec![
             Message { role: "user".to_string(), content: vec![
                 ContentBlock::Text { text: prompt.to_string() },
@@ -110,7 +110,14 @@ impl AnthropicAgent {
             if !resp.status().is_success() {
                 return Err(anyhow::anyhow!("Anthropic API request failed with status: {}\n{}", resp.status(), resp.text().await?));
             }
-            let res: ApiResponse = resp.json().await?;
+            let text = resp.text().await?;
+            let res: ApiResponse = match serde_json::from_str(&text) {
+                Ok(val) => val,
+                Err(e) => {
+                    eprintln!("Failed to parse response: {e}\nResponse body:\n{text}");
+                    return Err(e.into());
+                }
+            };
             let mut next_message = Message {
                 role: "user".to_string(),
                 content: vec![]
@@ -145,17 +152,20 @@ impl AnthropicAgent {
                                 ToolInput::Type { text } => {
                                     env.type_text(&text)?;
                                 }
-                                ToolInput::Key { key } => {
-                                    env.press_key(key)?;
+                                ToolInput::Key { text } => {
+                                    env.press_key(text)?;
                                 }
                                 ToolInput::Screenshot => {
                                     // Do nothing, screenshot will be provided below
                                 }
                             }
 
+                            // Add a small delay after tool execution to allow UI to update
+                            tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+
                             // Send new screenshot as tool result
                             screenshot = img_shrink(env.screenshot()?, ANTHROPIC_MAX_WIDTH, ANTHROPIC_MAX_HEIGHT);
-                            scale = screenshot.width() as f32 / env.width() as f32;
+                            scale = screenshot.width() as f32 / env.width()? as f32;
                             next_message.content.push(ContentBlock::ToolResult {
                                 content: vec![ContentBlock::Image { source: ImageSource::Base64 {
                                     media_type: "image/png".to_string(),

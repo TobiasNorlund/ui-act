@@ -12,7 +12,10 @@ pub struct MPXInput {
 impl MPXInput {
     pub fn create(monitor: &Monitor) -> Result<Self> {
         // Note: Uses the screen resolution of the first monitor
-        let (width, height) = (monitor.width()? as i32, monitor.height()? as i32);
+        // Multiply by scale_factor to get framebuffer size
+        let scale = monitor.scale_factor()?;
+        let width = (monitor.width()? as f32 * scale) as i32;
+        let height = (monitor.height()? as f32 * scale) as i32;
         let mouse = MouseDevice::create("ui-act-mouse", width, height)?;
         let keyboard = KeyboardDevice::create("ui-act-keyboard")?;
         println!("Created virtual mouse and keyboard");

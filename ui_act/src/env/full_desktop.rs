@@ -12,18 +12,19 @@ pub struct FullDesktopEnvironment {
 
 impl FullDesktopEnvironment {
     pub fn create() -> Result<Self> {
+        // TODO: Probably needs to be the upper left most monitor as we don't handle monitor offsets
         let monitor = get_first_monitor()?;
         Ok(FullDesktopEnvironment { input: MPXInput::create(&monitor)?, monitor: monitor })
     }
 }
 
 impl ComputerEnvironment for FullDesktopEnvironment {
-    fn width(&self) -> u32 {
-        self.monitor.width().unwrap()
+    fn width(&self) -> Result<u32> {
+        Ok(self.monitor.width()?)
     }
 
-    fn height(&self) -> u32 {
-        self.monitor.height().unwrap()
+    fn height(&self) -> Result<u32> {
+        Ok(self.monitor.height()?)
     }
 
     fn screenshot(&self) -> Result<image::RgbImage> {

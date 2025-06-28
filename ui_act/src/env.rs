@@ -1,10 +1,11 @@
 use anyhow::Result;
 
 pub mod full_desktop;
+pub mod single_window;
 
 pub trait ComputerEnvironment {
-    fn width(&self) -> u32;
-    fn height(&self) -> u32;
+    fn width(&self) -> Result<u32>;
+    fn height(&self) -> Result<u32>;
     fn screenshot(&self) -> Result<image::RgbImage>;
 
     // Mouse actions
