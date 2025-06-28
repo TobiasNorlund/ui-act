@@ -1,11 +1,9 @@
 use anyhow::Result;
 use serde_json::json;
-use std::io::{self, Cursor};
-use base64::{Engine as _, engine::general_purpose};
 use serde::{Serialize, Deserialize};
 use tokio::io::{AsyncWriteExt, AsyncBufReadExt, BufReader};
-
-use crate::env::MPXEnvironment;
+use crate::utils::{img_shrink, rgb_image_to_base64_png};
+use crate::env::ComputerEnvironment;
 
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -52,6 +50,8 @@ pub enum ToolInput {
     LeftClick { coordinate: [u32; 2] },
     #[serde(rename = "right_click")]
     RightClick { coordinate: [u32; 2] },
+    #[serde(rename = "double_click")]
+    DoubleClick { coordinate: [u32; 2] },
     #[serde(rename = "type")]
     Type { text: String },
     #[serde(rename = "key")]
@@ -85,15 +85,15 @@ impl AnthropicAgent {
         Ok(AnthropicAgent {client, api_key})
     }
 
-    pub async fn run(&self, mut env: MPXEnvironment, prompt: &str) -> Result<()> {
-        // Note: env.screenshot is likely blocking; adapt to async if possible
-        let mut screenshot = env.screenshot(Some(ANTHROPIC_MAX_WIDTH), Some(ANTHROPIC_MAX_HEIGHT))?;
+    pub async fn run<T: ComputerEnvironment>(&self, mut env: T, prompt: &str) -> Result<()> {
+        let mut screenshot = img_shrink(env.screenshot()?, ANTHROPIC_MAX_WIDTH, ANTHROPIC_MAX_HEIGHT);
+        let mut scale: f32 = screenshot.width() as f32 / env.width() as f32; // Scale relative environment
         let mut messages: Vec<Message> = vec![
             Message { role: "user".to_string(), content: vec![
                 ContentBlock::Text { text: prompt.to_string() },
                 ContentBlock::Image { source: ImageSource::Base64 {
                     media_type: "image/png".to_string(),
-                    data: rgba_image_to_base64_png(&screenshot)?
+                    data: rgb_image_to_base64_png(&screenshot)?
                 }}
             ]}
         ];
@@ -125,34 +125,41 @@ impl AnthropicAgent {
                         if name == "computer" {
                             match input {
                                 ToolInput::LeftClick { coordinate } => {
-                                    let x = coordinate[0] as f32 / screenshot.width() as f32;
-                                    let y = coordinate[1] as f32 / screenshot.height() as f32;
-                                    env.mouse.mouse_move(x, y)?;
-                                    env.mouse.left_click()?;
+                                    let x = (coordinate[0] as f32 / scale).round() as u32;
+                                    let y = (coordinate[1] as f32 / scale).round() as u32;
+                                    env.mouse_move(x, y)?;
+                                    env.left_click()?;
                                 }
                                 ToolInput::RightClick { coordinate } => {
-                                    let x = coordinate[0] as f32 / screenshot.width() as f32;
-                                    let y = coordinate[1] as f32 / screenshot.height() as f32;
-                                    env.mouse.mouse_move(x, y)?;
-                                    env.mouse.right_click()?;
+                                    let x = (coordinate[0] as f32 / scale).round() as u32;
+                                    let y = (coordinate[1] as f32 / scale).round() as u32;
+                                    env.mouse_move(x, y)?;
+                                    env.right_click()?;
+                                }
+                                ToolInput::DoubleClick { coordinate } => {
+                                    let x = (coordinate[0] as f32 / scale).round() as u32;
+                                    let y = (coordinate[1] as f32 / scale).round() as u32;
+                                    env.mouse_move(x, y)?;
+                                    env.double_click()?;
                                 }
                                 ToolInput::Type { text } => {
-                                    env.keyboard.type_text(&text)?;
+                                    env.type_text(&text)?;
                                 }
                                 ToolInput::Key { key } => {
-                                    env.keyboard.press_key(key)?;
+                                    env.press_key(key)?;
                                 }
                                 ToolInput::Screenshot => {
-                                    // Do nothing
+                                    // Do nothing, screenshot will be provided below
                                 }
                             }
 
                             // Send new screenshot as tool result
-                            screenshot = env.screenshot(Some(ANTHROPIC_MAX_WIDTH), Some(ANTHROPIC_MAX_HEIGHT))?;
+                            screenshot = img_shrink(env.screenshot()?, ANTHROPIC_MAX_WIDTH, ANTHROPIC_MAX_HEIGHT);
+                            scale = screenshot.width() as f32 / env.width() as f32;
                             next_message.content.push(ContentBlock::ToolResult {
                                 content: vec![ContentBlock::Image { source: ImageSource::Base64 {
                                     media_type: "image/png".to_string(),
-                                    data: rgba_image_to_base64_png(&screenshot)?
+                                    data: rgb_image_to_base64_png(&screenshot)?
                                 }}],
                                 tool_use_id: id.clone(),
                                 is_error: false
@@ -221,14 +228,4 @@ impl AnthropicAgent {
             .send()
             .await
     }
-}
-
-fn rgba_image_to_base64_png(img: &image::RgbaImage) -> Result<String> {
-    let mut buffer = Vec::new();
-    let mut cursor = Cursor::new(&mut buffer);
-    
-    img.write_to(&mut cursor, image::ImageFormat::Png)?;
-    
-    let base64_string = general_purpose::STANDARD.encode(&buffer);
-    Ok(base64_string)
 }

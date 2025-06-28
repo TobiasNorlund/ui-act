@@ -1,8 +1,13 @@
-use crate::agent::AnthropicAgent;
-use std::env as std_env;
-
-mod env;
+mod input;
+mod device;
 mod agent;
+mod env;
+mod utils;
+
+use std::env as std_env;
+use crate::agent::AnthropicAgent;
+use crate::env::full_desktop::FullDesktopEnvironment;
+
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -15,16 +20,14 @@ async fn main() -> anyhow::Result<()> {
             std::process::exit(1);
         }
     };
-    let env = env::MPXEnvironment::create()?;
+    let env = FullDesktopEnvironment::create()?;
     let agent = AnthropicAgent::create().await?;
-
     tokio::select! {
         result = agent.run(env, &prompt) => {
             result?;
         }
         _ = tokio::signal::ctrl_c() => {
             println!("Received Ctrl-C, shutting down gracefully...");
-            // When main returns, env will be dropped, and XInputMaster::drop will run.
         }
     }
 
