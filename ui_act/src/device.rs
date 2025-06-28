@@ -222,14 +222,30 @@ impl KeyboardDevice {
     }
 
     pub fn type_text(&mut self, text: &str) -> Result<()> {
-        for c in text.chars() {
-            if let Some(key) = char_to_key(c) {
-                self.device.send(key, 1)?;
-                self.device.synchronize()?;
-                thread::sleep(Duration::from_millis(50));
-                self.device.send(key, 0)?;
+       for c in text.chars() {
+            let keys = char_to_keys(c);
+            if keys.is_empty() {
+                continue; // skip unsupported chars
+            }
+            // Press all modifier keys except the last (main) key
+            for key in &keys[..keys.len().saturating_sub(1)] {
+                self.device.send(*key, 1)?;
                 self.device.synchronize()?;
             }
+            // Press the main key
+            let main_key = keys.last().unwrap();
+            self.device.send(*main_key, 1)?;
+            self.device.synchronize()?;
+            thread::sleep(Duration::from_millis(50));
+            // Release the main key
+            self.device.send(*main_key, 0)?;
+            self.device.synchronize()?;
+            // Release modifiers in reverse order
+            for key in keys[..keys.len().saturating_sub(1)].iter().rev() {
+                self.device.send(*key, 0)?;
+                self.device.synchronize()?;
+            }
+            thread::sleep(Duration::from_millis(50));
         }
         Ok(())
     }
@@ -271,12 +287,32 @@ fn parse_key_combination(combination: &str) -> Result<KeyCombination> {
             "alt" => Key::LeftAlt,
             "shift" => Key::LeftShift,
             "meta" | "win" | "super" => Key::LeftMeta,
-            "c" => Key::C,
-            "v" => Key::V,
-            "x" => Key::X,
-            "z" => Key::Z,
             "a" => Key::A,
+            "b" => Key::B,
+            "c" => Key::C,
+            "d" => Key::D,
+            "e" => Key::E,
             "f" => Key::F,
+            "g" => Key::G,
+            "h" => Key::H,
+            "i" => Key::I,
+            "j" => Key::J,
+            "k" => Key::K,
+            "l" => Key::L,
+            "m" => Key::M,
+            "n" => Key::N,
+            "o" => Key::O,
+            "p" => Key::P,
+            "q" => Key::Q,
+            "r" => Key::R,
+            "s" => Key::S,
+            "t" => Key::T,
+            "u" => Key::U,
+            "v" => Key::V,
+            "w" => Key::W,
+            "x" => Key::X,
+            "y" => Key::Y,
+            "z" => Key::Z,
             "f1" => Key::F1,
             "f2" => Key::F2,
             "f3" => Key::F3,
@@ -307,9 +343,13 @@ fn parse_key_combination(combination: &str) -> Result<KeyCombination> {
     Ok(KeyCombination { keys })
 }
 
-fn char_to_key(c: char) -> Option<uinput::event::keyboard::Key> {
+fn char_to_keys(c: char) -> Vec<uinput::event::keyboard::Key> {
     use uinput::event::keyboard::Key;
-    match c {
+    let mut keys = vec![];
+    if c.is_uppercase() {
+        keys.push(Key::LeftShift)
+    }
+    let key  = match c.to_ascii_lowercase() {
         'a' => Some(Key::A),
         'b' => Some(Key::B),
         'c' => Some(Key::C),
@@ -349,6 +389,11 @@ fn char_to_key(c: char) -> Option<uinput::event::keyboard::Key> {
         ' ' => Some(Key::Space),
         '.' => Some(Key::Dot),
         ',' => Some(Key::Comma),
-        _ => None,
+        '\n' => Some(Key::Enter),
+        _ => None
+    };
+    if key.is_some() {
+        keys.push(key.unwrap());
     }
+    keys
 }
