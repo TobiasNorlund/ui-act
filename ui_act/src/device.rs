@@ -38,16 +38,6 @@ impl XInputMaster {
     }
 }
 
-impl Drop for XInputMaster {
-    fn drop(&mut self) {
-        if let Err(e) = run_xinput(&["remove-master", &self.pointer_id.to_string()]) {
-            eprintln!("Failed to remove master device {} (id={}): {}", self.name, self.pointer_id, e);
-        } else {
-            println!("Removed master device: {} (id={})", self.name, self.pointer_id);
-        }
-    }
-}
-
 fn get_device_id_by_name(name: &str) -> Result<i32> {
     let output = Command::new("xinput").arg("list").output()?;
     let stdout = String::from_utf8_lossy(&output.stdout);

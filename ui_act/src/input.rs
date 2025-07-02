@@ -7,6 +7,8 @@ pub struct MPXInput {
     master: XInputMaster,
     pub mouse: MouseDevice,
     pub keyboard: KeyboardDevice,
+    pub width: i32,
+    pub height: i32,
 }
 
 impl MPXInput {
@@ -28,6 +30,12 @@ impl MPXInput {
         run_xinput(&["reattach", &keyboard.id.to_string(), &master.keyboard_id.to_string()])?;
         //println!("Attached {} (id={}) to {} (id={})", keyboard.name, keyboard.id, master.name, master.keyboard_id);
     
-        Ok(MPXInput { master, mouse, keyboard })
+        Ok(MPXInput { master, mouse, keyboard, width, height })
+    }
+}
+
+impl Drop for MPXInput {
+    fn drop(&mut self) {
+        let _ = self.mouse.mouse_move((self.width - 1) as u32, (self.height - 1) as u32);
     }
 }
