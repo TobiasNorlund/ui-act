@@ -2,9 +2,14 @@
 <schemalist>
   <schema id="org.gnome.shell.extensions.ui-act" path="/org/gnome/shell/extensions/ui-act/">
     <key name="ui-act-launch" type="as">
-      <default><![CDATA[['<Super>space']]]></default>
+      <default><![CDATA[['<Ctrl>space']]]></default>
       <summary>Launch UI Act</summary>
       <description>Set the keyboard shortcut for launching UI Act.</description>
+    </key>
+    <key name="anthropic-api-key" type="s">
+      <default>''</default>
+      <summary>Anthropic API Key</summary>
+      <description>Stores the API key for accessing Anthropic API.</description>
     </key>
   </schema>
 </schemalist>

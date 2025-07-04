@@ -19,8 +19,8 @@ import Gio from 'gi://Gio';
 import Shell from 'gi://Shell';
 
 
-const ScreenshotButton = GObject.registerClass(
-class ScreenshotButton extends PanelMenu.Button {
+const PanelIcon = GObject.registerClass(
+class PanelIcon extends PanelMenu.Button {
     _init(extension) {
         super._init(0.0, 'UI Act');
 
@@ -30,9 +30,6 @@ class ScreenshotButton extends PanelMenu.Button {
             icon_size: 32,
             style_class: 'system-status-icon'
         }));
-
-        // Connect the click event
-        //this.connect('button-press-event', () => this._extension.toggleOverlay());
     }
 });
 
@@ -46,7 +43,7 @@ class WindowSelectionOverlay extends St.DrawingArea {
     }
 
     setSelection(window) {
-        console.log(`setting selection for window: ${window}`);
+        //console.log(`setting selection for window: ${window}`);
         if (window) {
             const rect = window.get_frame_rect();
             this._selectionRect = rect;
@@ -84,10 +81,11 @@ class WindowSelectionOverlay extends St.DrawingArea {
 
 
 const LauncherUI = GObject.registerClass({
-    // We can define signals for our widget.
-    // This lets other parts of the code know when the close button was clicked.
     Signals: {
         'closed': {},
+        'run': {
+            param_types: [GObject.TYPE_STRING],
+        },
     },
 },
 class LauncherUI extends St.BoxLayout {
@@ -134,19 +132,37 @@ class LauncherUI extends St.BoxLayout {
         bottomBar.add_child(new St.Widget({ x_expand: true }));
 
         // Create the play button
-        const runButton = new St.Button({
+        this._runButton = new St.Button({
             style_class: 'run-button',
-            //x_align: Clutter.ActorAlign.END,
             child: new St.Icon({
                 icon_name: 'media-playback-start-symbolic',
                 style_class: 'popup-menu-icon',
             }),
+            reactive: false, // Initially disabled
+            can_focus: false,
+            opacity: 100
         });
-        bottomBar.add_child(runButton);
-
-        // Add the bottom bar to the main container
+        bottomBar.add_child(this._runButton);
         this.add_child(bottomBar);
 
+        // Enable/disable run button based on prompt input
+        this.promptInput.get_clutter_text().connect('text-changed', () => {
+            const text = this.promptInput.get_text();
+            const enabled = text.trim().length > 0;
+            this._runButton.reactive = enabled;
+            this._runButton.can_focus = enabled;
+            this._runButton.opacity = enabled ? 255 : 100;
+        });
+
+        const tryRun = () => {
+            const text = this.promptInput.get_text();
+            if (text.trim().length > 0) {
+                this.emit('run', text);
+                this.promptInput.set_text('');
+            }
+        };
+        this._runButton.connect('clicked', tryRun);
+        this.promptInput.get_clutter_text().connect('activate', tryRun);
     }
 });
 
@@ -157,12 +173,13 @@ export default class UIActExtension extends Extension {
 
         // Init
         this._modal_grab = null;
+        this._windowSelection = null;
+        this._settings = this.getSettings();
 
-        // Register Super+space keybinding
-        this._settings = this.getSettings("org.gnome.shell.extensions.ui-act");
-        this._launchKeybindingKey = 'ui-act-launch';
+        // Register keybinding
+        this._toggleLauncherKeybindingKey = 'ui-act-launch';
         Main.wm.addKeybinding(
-            this._launchKeybindingKey,
+            this._toggleLauncherKeybindingKey,
             this._settings,
             Meta.KeyBindingFlags.NONE,
             Shell.ActionMode.NORMAL,
@@ -190,6 +207,18 @@ export default class UIActExtension extends Extension {
         this._launcherUI.connect('closed', () => {
             this.hide();
         });
+        this._launcherUI.connect('run', (obj, prompt) => {
+            // Hack: Parse the window description to find a hexadecimal beginning (e.g. "0x...") at the start
+            let desc = this._windowSelection.get_description();
+            let hexMatch = desc.match(/^(0x[0-9a-fA-F]+)/);
+            if (hexMatch) { 
+                let hexValue = hexMatch[1];
+                let decimalValue = parseInt(hexValue, 16);
+                this.run(decimalValue, prompt);
+            } else {
+                console.log("No hex value found in description");
+            }
+        });
     
         // Position in center of screen
         this._root.add_child(this._launcherUI);
@@ -200,23 +229,24 @@ export default class UIActExtension extends Extension {
         Main.layoutManager.addChrome(this._root);
 
         // Create the button and add it to the top panel
-        this._indicator = new ScreenshotButton(this);
-        Main.panel.addToStatusArea('ui-act', this._indicator);
+        this._panelIcon = new PanelIcon(this);
+        Main.panel.addToStatusArea('ui-act', this._panelIcon);
+        this._panelIcon.connect('button-press-event', () => this.toggleShowHide());
     }
 
     disable() {
         console.log('Disabling UI Act Extension');
 
         // Remove the keybinding
-        if (this._launchKeybindingKey) {
-            Main.wm.removeKeybinding(this._launchKeybindingKey);
+        if (this._toggleLauncherKeybindingKey) {
+            Main.wm.removeKeybinding(this._toggleLauncherKeybindingKey);
             this._settings = null;
         }
 
         // Remove the indicator from the panel
-        if (this._indicator) {
-            this._indicator.destroy();
-            this._indicator = null;
+        if (this._panelIcon) {
+            this._panelIcon.destroy();
+            this._panelIcon = null;
         }
 
         // Destroy the overlay and its child container
@@ -226,25 +256,47 @@ export default class UIActExtension extends Extension {
         }
     }
 
+    get isLauncherVisible() {
+        return this._root.visible;
+    }
+
+    get windowSelection() {
+        return this._windowSelection;
+    }
+
+    set windowSelection(window) {
+        this._windowSelection = window;
+        this._windowSeletionOverlay.setSelection(window);
+    }
+
+    toggleShowHide() {
+        console.log("Toggling UI Act launcher visibility");
+        if (this.isLauncherVisible) {
+            this.hide();
+        } else { 
+            this.show();
+        }
+    }
+
     show() {
-        if (this._root.visible)
+        if (this.isLauncherVisible)
             return;
 
         console.log("Showing UI Act launcher");
         this._root.visible = true;
         this._modal_grab = Main.pushModal(this._root);
 
-        // Update selected window in background
+        // Update selected window to the first in tab list
         const workspace = global.workspace_manager.get_active_workspace();
         const stackedWindows = global.display.get_tab_list(Meta.TabList.NORMAL_ALL, workspace);
         const firstWindow = stackedWindows.length > 0 ? stackedWindows[0] : null;
-        this._windowSeletionOverlay.setSelection(firstWindow);
+        this.windowSelection = firstWindow;
 
         // Add key event handler for Escape
         if (!this._keyPressEventHandler) {
             this._keyPressEventHandler = this._root.connect('key-press-event', (actor, event) => {
                 let symbol = event.get_key_symbol();
-                if (symbol === Clutter.KEY_Escape && this._root.visible) {
+                if (symbol === Clutter.KEY_Escape && this.isLauncherVisible) {
                     this.hide();
                     return Clutter.EVENT_STOP;
                 }
@@ -269,13 +321,20 @@ export default class UIActExtension extends Extension {
             this._root.disconnect(this._keyPressEventHandler);
             this._keyPressEventHandler = null;
         }
+    }
 
-        // let workspace = global.workspace_manager.get_active_workspace();
-        // let stackedWindows = global.display.get_tab_list(Meta.TabList.NORMAL_ALL, workspace);
-        
-        // stackedWindows.forEach((window, index) => {
-        //     let rect = window.get_frame_rect();
-        //     console.log(`${index}: ${window.get_title()} - x:${rect.x} y:${rect.y} w:${rect.width} h:${rect.height}`);
-        // });
+    run(windowId, prompt) {
+        try {
+            console.log(`Running UI Act with windowId: ${windowId} and prompt: ${prompt}`);
+            let anthropicApiKey = this._settings.get_string('anthropic-api-key');
+            let launcher = new Gio.SubprocessLauncher({
+                flags: Gio.SubprocessFlags.NONE,
+            });
+            launcher.setenv('ANTHROPIC_API_KEY', anthropicApiKey, true);
+            let proc = launcher.spawnv(['ui_act', '--window', windowId.toString(), prompt]);
+            this.hide();
+        } catch (e) {
+            logError(e, 'Failed to spawn process');
+        }
     }
 }

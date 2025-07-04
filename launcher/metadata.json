@@ -2,7 +2,6 @@
     "name": "UI Act",
     "description": "Launch UI agents on your desktop",
     "uuid": "ui-act@tobiasnorlund.github.com",
-    "shell-version": [
-      "48"
-    ]
+    "shell-version": ["48"],
+    "settings-schema": "org.gnome.shell.extensions.ui-act"
   }
