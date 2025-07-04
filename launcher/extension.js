@@ -125,6 +125,12 @@ class LauncherUI extends St.BoxLayout {
             can_focus: true,
             x_expand: true,
         });
+        let clutterText = this.promptInput.get_clutter_text();
+        clutterText.set_editable(true);
+        clutterText.set_line_wrap(true);
+        clutterText.set_single_line_mode(false); // Important
+        clutterText.set_max_length(-1);
+        clutterText.set_selectable(true);
         this.add_child(this.promptInput);
         this.add_child(new St.Widget({ y_expand: true })); // Spacer
 
