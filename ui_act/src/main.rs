@@ -37,6 +37,7 @@ async fn main() -> anyhow::Result<()> {
     
     let agent = AnthropicAgent::create().await?;
     
+    let mut sighup_stream = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup())?;
     tokio::select! {
         result = {
             if let Some(wid) = window_id {
@@ -51,6 +52,9 @@ async fn main() -> anyhow::Result<()> {
         }
         _ = tokio::signal::ctrl_c() => {
             println!("Received Ctrl-C, shutting down gracefully...");
+        }
+        _ = sighup_stream.recv() => {
+            println!("Received SIGHUP, shutting down gracefully...");
         }
     }
 

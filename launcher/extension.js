@@ -337,7 +337,17 @@ export default class UIActExtension extends Extension {
                 flags: Gio.SubprocessFlags.NONE,
             });
             launcher.setenv('ANTHROPIC_API_KEY', anthropicApiKey, true);
-            let proc = launcher.spawnv(['ui_act', '--window', windowId.toString(), prompt]);
+            
+            // Launch ui_act in a new terminal window
+            let terminalCommand = [
+                'gnome-terminal',
+                '--',
+                'ui_act',
+                '--window',
+                windowId.toString(),
+                prompt
+            ];
+            let proc = launcher.spawnv(terminalCommand);
             this.hide();
         } catch (e) {
             logError(e, 'Failed to spawn process');

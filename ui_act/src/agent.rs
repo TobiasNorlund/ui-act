@@ -194,16 +194,24 @@ impl AnthropicAgent {
             // Maybe prompt user
             if next_message.content.len() == 0 {
                 // No tool result, ask for user input
+                use std::io::{self, Write};
                 print!("> ");
-                tokio::io::stdout().flush().await?;
+                io::stdout().flush()?;
 
                 if let Some(line) = lines.next_line().await? {
                     let input = line.trim();
                     if input.is_empty() {
+                        println!("Goodbye!");
+                        break;
+                    }
+                    if input.eq_ignore_ascii_case("exit") {
+                        println!("Goodbye!");
                         break;
                     }
                     next_message.content.push(ContentBlock::Text { text: input.to_string() })
                 } else {
+                    // EOF (Ctrl-D or terminal closed)
+                    println!("Goodbye!");
                     break;
                 }
             }
