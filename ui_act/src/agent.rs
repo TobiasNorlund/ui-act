@@ -1,10 +1,48 @@
 use anyhow::Result;
 use serde_json::json;
 use serde::{Serialize, Deserialize};
-use tokio::io::{AsyncWriteExt, AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, BufReader};
+use uuid::Uuid;
 use crate::utils::{img_shrink, rgb_image_to_base64_png};
 use crate::env::ComputerEnvironment;
 
+// Global telemetry function
+pub async fn send_telemetry(session_id: &str, event_type: &str, reason: Option<&str>, action_count: Option<u32>) -> Result<()> {
+    let mut payload = json!({
+        "type": event_type
+    });
+    
+    if let Some(reason_val) = reason {
+        payload["reason"] = json!(reason_val);
+    }
+    
+    if let Some(count) = action_count {
+        payload["action_count"] = json!(count);
+    }
+
+    let telemetry_data = json!({
+        "session_id": session_id,
+        "client_version": env!("CARGO_PKG_VERSION"),
+        "payload": payload
+    });
+
+    // You can configure the telemetry endpoint via environment variable
+    let telemetry_url = std::env::var("TELEMETRY_ENDPOINT")
+        .unwrap_or_else(|_| "http://localhost:8000/events".to_string());
+
+    let client = reqwest::Client::new();
+    let response = client.post(&telemetry_url)
+        .header("content-type", "application/json")
+        .json(&telemetry_data)
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        return Err(anyhow::anyhow!("Telemetry request failed with status: {}", response.status()));
+    }
+
+    Ok(())
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 struct ApiResponse {
@@ -75,6 +113,8 @@ const ANTHROPIC_MAX_HEIGHT: u32 = 768;
 pub struct AnthropicAgent {
     client: reqwest::Client,
     api_key: String,
+    pub session_id: String,
+    pub action_count: std::cell::Cell<u32>,
 }
 
 impl AnthropicAgent {
@@ -82,7 +122,20 @@ impl AnthropicAgent {
         let client = reqwest::Client::new();
         let api_key = std::env::var("ANTHROPIC_API_KEY")
             .expect("ANTHROPIC_API_KEY environment variable not set");
-        Ok(AnthropicAgent {client, api_key})
+        
+        let agent = AnthropicAgent {
+            client, 
+            api_key,
+            session_id: Uuid::new_v4().to_string(),
+            action_count: std::cell::Cell::new(0),
+        };
+        
+        // Send session start telemetry
+        if let Err(e) = send_telemetry(&agent.session_id, "session_start", None, None).await {
+            eprintln!("Failed to send telemetry: {}", e);
+        }
+        
+        Ok(agent)
     }
 
     pub async fn run(&self, mut env: Box<dyn ComputerEnvironment>, prompt: &str) -> Result<()> {
@@ -125,11 +178,12 @@ impl AnthropicAgent {
             for block in &res.content {
                 match block {
                     ContentBlock::Text {text} => {
-                        println!("Assistant: {}", text);
+                        println!("\nUI-Act:\n{}", text);
                     }
                     ContentBlock::ToolUse { name, input, id } => {
-                        println!("Assistant tool call: {} with input: {:?}", name, input);
+                        println!("  {:?}", input);
                         if name == "computer" {
+                            self.action_count.set(self.action_count.get() + 1);
                             match input {
                                 ToolInput::LeftClick { coordinate } => {
                                     let x = (coordinate[0] as f32 / scale).round() as u32;
@@ -195,22 +249,26 @@ impl AnthropicAgent {
             if next_message.content.len() == 0 {
                 // No tool result, ask for user input
                 use std::io::{self, Write};
-                print!("> ");
+                print!("\n> ");
                 io::stdout().flush()?;
 
                 if let Some(line) = lines.next_line().await? {
                     let input = line.trim();
-                    if input.is_empty() {
-                        println!("Goodbye!");
-                        break;
-                    }
-                    if input.eq_ignore_ascii_case("exit") {
+                    if input.is_empty() || input.eq_ignore_ascii_case("exit") {
+                        // Send session end telemetry
+                        if let Err(e) = send_telemetry(&self.session_id, "session_end", Some("success"), Some(self.action_count.get())).await {
+                            eprintln!("Failed to send session end telemetry: {}", e);
+                        }
                         println!("Goodbye!");
                         break;
                     }
                     next_message.content.push(ContentBlock::Text { text: input.to_string() })
                 } else {
                     // EOF (Ctrl-D or terminal closed)
+                    // Send session end telemetry
+                    if let Err(e) = send_telemetry(&self.session_id, "session_end", Some("success"), Some(self.action_count.get())).await {
+                        eprintln!("Failed to send session end telemetry: {}", e);
+                    }
                     println!("Goodbye!");
                     break;
                 }

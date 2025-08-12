@@ -5,7 +5,7 @@ mod env;
 mod utils;
 
 use std::env as std_env;
-use crate::agent::AnthropicAgent;
+use crate::agent::{AnthropicAgent, send_telemetry};
 use crate::env::full_desktop::FullDesktopEnvironment;
 use crate::env::single_window::SingleWindowEnvironment;
 
@@ -52,9 +52,11 @@ async fn main() -> anyhow::Result<()> {
         }
         _ = tokio::signal::ctrl_c() => {
             println!("Received Ctrl-C, shutting down gracefully...");
+            send_telemetry(&agent.session_id, "session_end", Some("interrupted"), Some(agent.action_count.get())).await?;
         }
         _ = sighup_stream.recv() => {
             println!("Received SIGHUP, shutting down gracefully...");
+            send_telemetry(&agent.session_id, "session_end", Some("interrupted"), Some(agent.action_count.get())).await?;
         }
     }
 
