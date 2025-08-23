@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, Context};
 use image::DynamicImage;
 use xcap::Monitor;
 use x11rb::protocol::xproto::{ConnectionExt, *};
@@ -64,9 +64,40 @@ impl SingleWindowEnvironment {
         
         Ok(())
     }
+
+    fn get_xwindow_name(&self) -> Result<String> {
+        // Try to get the window name using X11
+        let reply = self.xconn.get_property(
+            false,
+            self.xwindow_id,
+            self.xconn.intern_atom(false, b"_NET_WM_NAME")?.reply()?.atom,
+            self.xconn.intern_atom(false, b"UTF8_STRING")?.reply()?.atom,
+            0,
+            1024,
+        )?.reply().context("Failed to get _NET_WM_NAME property")?;
+
+        if let Some(name_bytes) = reply.value.get(..) {
+            if let Ok(name) = std::str::from_utf8(name_bytes) {
+                return Ok(name.to_string());
+            } else {
+                return Err(anyhow::anyhow!("Failed to decode window name from _NET_WM_NAME property"));
+            }
+        } else {
+            return Err(anyhow::anyhow!("Failed to get window name from _NET_WM_NAME property"));
+        }
+    }
 }
 
 impl ComputerEnvironment for SingleWindowEnvironment {
+
+    fn name(&self) -> String {
+        if let Ok(name) = self.get_xwindow_name() {
+            name
+        } else {
+            "Unknown window name".to_string()
+        }
+    }
+
     fn width(&self) -> Result<u32> {
         // Window resolution in framebuffer scale
         let geom = self.xconn.get_geometry(self.xwindow_id)?.reply()?;

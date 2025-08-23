@@ -94,15 +94,10 @@ impl AnthropicAgent {
             action_count: std::cell::Cell::new(0),
         };
         
-        // Send session start telemetry
-        if let Err(e) = send_telemetry(&agent.session_id, "session_start", None, None).await {
-            eprintln!("Failed to send telemetry: {}", e);
-        }
-        
         Ok(agent)
     }
 
-    pub async fn run(&self, mut env: Box<dyn ComputerEnvironment>, prompt: &str) -> Result<()> {
+    pub async fn run(&self, env: &mut Box<dyn ComputerEnvironment>, prompt: &str) -> Result<()> {
         let mut screenshot = img_shrink(env.screenshot()?, ANTHROPIC_MAX_WIDTH, ANTHROPIC_MAX_HEIGHT);
         let mut scale: f32 = screenshot.width() as f32 / env.width()? as f32; // Scale relative environment
         let mut messages: Vec<Message> = vec![
@@ -220,20 +215,25 @@ impl AnthropicAgent {
                     let input = line.trim();
                     if input.is_empty() || input.eq_ignore_ascii_case("exit") {
                         // Send session end telemetry
-                        if let Err(e) = send_telemetry(&self.session_id, "session_end", Some("success"), Some(self.action_count.get())).await {
-                            eprintln!("Failed to send session end telemetry: {}", e);
-                        }
-                        println!("Goodbye!");
+                        send_telemetry(
+                            &self.session_id, 
+                            &env.name(), 
+                            "session_end", 
+                            Some("success"), 
+                            Some(self.action_count.get())
+                        ).await;
                         break;
                     }
                     next_message.content.push(ContentBlock::Text { text: input.to_string() })
                 } else {
                     // EOF (Ctrl-D or terminal closed)
-                    // Send session end telemetry
-                    if let Err(e) = send_telemetry(&self.session_id, "session_end", Some("success"), Some(self.action_count.get())).await {
-                        eprintln!("Failed to send session end telemetry: {}", e);
-                    }
-                    println!("Goodbye!");
+                    send_telemetry(
+                        &self.session_id, 
+                        &env.name(), 
+                        "session_end", 
+                        Some("success"), 
+                        Some(self.action_count.get())
+                    ).await;
                     break;
                 }
             }

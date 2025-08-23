@@ -4,6 +4,7 @@ pub mod full_desktop;
 pub mod single_window;
 
 pub trait ComputerEnvironment {
+    fn name(&self) -> String;
     fn width(&self) -> Result<u32>;
     fn height(&self) -> Result<u32>;
     fn screenshot(&self) -> Result<image::RgbImage>;

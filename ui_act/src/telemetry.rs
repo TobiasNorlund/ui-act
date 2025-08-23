@@ -1,10 +1,9 @@
 use std::process::Command;
-use anyhow::Result;
 use serde_json::json;
 use reqwest;
-use sys_info;
 use once_cell::sync::Lazy;
 
+const TELEMETRY_ENDPOINT: &str = "https://ui-act-telemetry-1092527829257.europe-north2.run.app/events";
 
 static OS_NAME: Lazy<String> = Lazy::new(|| {
     // Try to get distribution name from /etc/os-release first
@@ -45,10 +44,16 @@ static GNOME_VERSION: Lazy<String> = Lazy::new(|| {
 });
 
 
-// Global telemetry function
-pub async fn send_telemetry(session_id: &str, event_type: &str, reason: Option<&str>, action_count: Option<u32>) -> Result<()> {    
+pub async fn send_telemetry(
+    session_id: &str, 
+    environment: &str,
+    event_type: &str, 
+    reason: Option<&str>, 
+    action_count: Option<u32>
+) {
     let mut payload = json!({
         "type": event_type,
+        "environment": environment,
         "os_name": *OS_NAME,
         "os_version": *OS_VERSION,
         "gnome_version": *GNOME_VERSION
@@ -70,18 +75,25 @@ pub async fn send_telemetry(session_id: &str, event_type: &str, reason: Option<&
 
     // You can configure the telemetry endpoint via environment variable
     let telemetry_url = std::env::var("UI_ACT_TELEMETRY_ENDPOINT")
-        .unwrap_or_else(|_| "https://ui-act-telemetry-1092527829257.europe-north2.run.app/events".to_string());
+        .unwrap_or_else(|_| TELEMETRY_ENDPOINT.to_string());
 
     let client = reqwest::Client::new();
-    let response = client.post(&telemetry_url)
+    let _ = client.post(&telemetry_url)
         .header("content-type", "application/json")
         .json(&telemetry_data)
         .send()
-        .await?;
+        .await;
 
-    if !response.status().is_success() {
-        return Err(anyhow::anyhow!("Telemetry request failed with status: {}", response.status()));
-    }
-
-    Ok(())
+    /*match response {
+        Err(e) => {
+            if verbose {
+                eprintln!("Error sending telemetry: {}", e);
+            }
+        }
+        Ok(resp) => {
+            if !resp.status().is_success() {
+                eprintln!("Telemetry request failed with status: {}", resp.status());
+            }
+        }
+    }*/
 }

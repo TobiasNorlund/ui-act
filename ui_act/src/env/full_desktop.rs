@@ -19,6 +19,10 @@ impl FullDesktopEnvironment {
 }
 
 impl ComputerEnvironment for FullDesktopEnvironment {
+    fn name(&self) -> String {
+        "desktop".to_string()
+    }
+
     fn width(&self) -> Result<u32> {
         Ok(self.monitor.width()?)
     }

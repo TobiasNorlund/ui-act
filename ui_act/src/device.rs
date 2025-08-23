@@ -24,7 +24,7 @@ impl XInputMaster {
         let keyboard_id = get_device_id_by_name(&format!("{} keyboard", name));
 
         if let (Ok(pointer_id), Ok(keyboard_id)) = (pointer_id, keyboard_id) {
-            println!("master {name} with ids {pointer_id} and {keyboard_id} already exists!");
+            //println!("master {name} with ids {pointer_id} and {keyboard_id} already exists!");
             return Ok(XInputMaster { name: name.to_string(), pointer_id, keyboard_id });
         }
         // Otherwise, create it
@@ -56,7 +56,7 @@ fn get_device_id_by_name(name: &str) -> Result<i32> {
 }
 
 pub fn run_xinput(args: &[&str]) -> Result<()> {
-    println!("Running: xinput {}", args.join(" "));
+    //println!("Running: xinput {}", args.join(" "));
     let output = Command::new("xinput").args(args).output()?;
     if !output.status.success() {
         return Err(anyhow!(
