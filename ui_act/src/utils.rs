@@ -1,5 +1,4 @@
 use std::io::Cursor;
-
 use anyhow::{anyhow, Result};
 use base64::engine::general_purpose;
 use base64::Engine as _;

@@ -3,46 +3,10 @@ use serde_json::json;
 use serde::{Serialize, Deserialize};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use uuid::Uuid;
+use crate::telemetry::send_telemetry;
 use crate::utils::{img_shrink, rgb_image_to_base64_png};
 use crate::env::ComputerEnvironment;
 
-// Global telemetry function
-pub async fn send_telemetry(session_id: &str, event_type: &str, reason: Option<&str>, action_count: Option<u32>) -> Result<()> {
-    let mut payload = json!({
-        "type": event_type
-    });
-    
-    if let Some(reason_val) = reason {
-        payload["reason"] = json!(reason_val);
-    }
-    
-    if let Some(count) = action_count {
-        payload["action_count"] = json!(count);
-    }
-
-    let telemetry_data = json!({
-        "session_id": session_id,
-        "client_version": env!("CARGO_PKG_VERSION"),
-        "payload": payload
-    });
-
-    // You can configure the telemetry endpoint via environment variable
-    let telemetry_url = std::env::var("TELEMETRY_ENDPOINT")
-        .unwrap_or_else(|_| "http://localhost:8000/events".to_string());
-
-    let client = reqwest::Client::new();
-    let response = client.post(&telemetry_url)
-        .header("content-type", "application/json")
-        .json(&telemetry_data)
-        .send()
-        .await?;
-
-    if !response.status().is_success() {
-        return Err(anyhow::anyhow!("Telemetry request failed with status: {}", response.status()));
-    }
-
-    Ok(())
-}
 
 #[derive(Debug, Deserialize, Serialize)]
 struct ApiResponse {

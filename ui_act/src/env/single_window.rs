@@ -58,6 +58,10 @@ impl SingleWindowEnvironment {
         )?;
         
         self.xconn.flush()?;
+
+        // Sleep for 500ms to allow the window manager to process the always-on-top request
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        
         Ok(())
     }
 }
@@ -80,6 +84,8 @@ impl ComputerEnvironment for SingleWindowEnvironment {
         let image = self.monitor.capture_image()?;
         // Crop to window geometry
         let image = image::imageops::crop_imm(&image, geom.x as u32, geom.y as u32, geom.width as u32, geom.height as u32);
+        // Save the cropped image to a file for debugging
+        //image.to_image().save("single_window_screenshot.png")?;
         let image = DynamicImage::ImageRgba8(image.to_image()).to_rgb8();
         //image.save("screenshot.png")?;
         Ok(image)
