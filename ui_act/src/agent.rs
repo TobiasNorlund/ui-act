@@ -3,7 +3,7 @@ use serde_json::json;
 use serde::{Serialize, Deserialize};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use uuid::Uuid;
-use crate::telemetry::send_telemetry;
+use crate::telemetry::post_telemetry;
 use crate::utils::{img_shrink, rgb_image_to_base64_png};
 use crate::env::ComputerEnvironment;
 
@@ -97,7 +97,7 @@ impl AnthropicAgent {
         Ok(agent)
     }
 
-    pub async fn run(&self, env: &mut Box<dyn ComputerEnvironment>, prompt: &str) -> Result<()> {
+    pub async fn run(&self, env: &mut Box<dyn ComputerEnvironment>, prompt: &str, send_telemetry: bool) -> Result<()> {
         let mut screenshot = img_shrink(env.screenshot()?, ANTHROPIC_MAX_WIDTH, ANTHROPIC_MAX_HEIGHT);
         let mut scale: f32 = screenshot.width() as f32 / env.width()? as f32; // Scale relative environment
         let mut messages: Vec<Message> = vec![
@@ -215,25 +215,29 @@ impl AnthropicAgent {
                     let input = line.trim();
                     if input.is_empty() || input.eq_ignore_ascii_case("exit") {
                         // Send session end telemetry
-                        send_telemetry(
+                        if send_telemetry {
+                            post_telemetry(
+                                &self.session_id, 
+                                &env.name(), 
+                                "session_end", 
+                                Some("success"), 
+                                Some(self.action_count.get())
+                            ).await;
+                        }
+                        break;
+                    }
+                    next_message.content.push(ContentBlock::Text { text: input.to_string() })
+                } else {
+                    // EOF (Ctrl-D or terminal closed)
+                    if send_telemetry {
+                        post_telemetry(
                             &self.session_id, 
                             &env.name(), 
                             "session_end", 
                             Some("success"), 
                             Some(self.action_count.get())
                         ).await;
-                        break;
                     }
-                    next_message.content.push(ContentBlock::Text { text: input.to_string() })
-                } else {
-                    // EOF (Ctrl-D or terminal closed)
-                    send_telemetry(
-                        &self.session_id, 
-                        &env.name(), 
-                        "session_end", 
-                        Some("success"), 
-                        Some(self.action_count.get())
-                    ).await;
                     break;
                 }
             }

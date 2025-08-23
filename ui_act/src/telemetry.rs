@@ -44,7 +44,7 @@ static GNOME_VERSION: Lazy<String> = Lazy::new(|| {
 });
 
 
-pub async fn send_telemetry(
+pub async fn post_telemetry(
     session_id: &str, 
     environment: &str,
     event_type: &str, 
