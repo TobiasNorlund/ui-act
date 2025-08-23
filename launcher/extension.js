@@ -333,6 +333,7 @@ export default class UIActExtension extends Extension {
         try {
             console.log(`Running UI Act with windowId: ${windowId} and prompt: ${prompt}`);
             let anthropicApiKey = this._settings.get_string('anthropic-api-key');
+            let sendTelemetry = this._settings.get_boolean('telemetry-enabled');
             let launcher = new Gio.SubprocessLauncher({
                 flags: Gio.SubprocessFlags.NONE,
             });
@@ -345,6 +346,7 @@ export default class UIActExtension extends Extension {
                 'ui_act',
                 '--window',
                 windowId.toString(),
+                ...(sendTelemetry ? [] : ["--no-telemetry"]),
                 prompt
             ];
             let proc = launcher.spawnv(terminalCommand);

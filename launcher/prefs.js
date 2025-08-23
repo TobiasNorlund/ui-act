@@ -14,21 +14,30 @@ export default class MyExtensionPreferences extends ExtensionPreferences {
         });
         window.add(page);
 
-        // Create a preferences group
-        const group = new Adw.PreferencesGroup({
+        const generalPrefGroup = new Adw.PreferencesGroup({
+            title: 'General'
+        });
+        page.add(generalPrefGroup);
+        
+        // Add telemetry toggle directly to the page
+        const telemetryRow = new Adw.SwitchRow({
+            title: 'Send anonymous usage data',
+            subtitle: 'Help improve UI Act by sending anonymous telemetry. No keys, screenshots or prompts are sent.'
+        });
+        generalPrefGroup.add(telemetryRow);
+
+        // Create API preferences group
+        const apiPrefGroup = new Adw.PreferencesGroup({
             title: 'API Keys',
             description: 'Configure API keys'
         });
-        page.add(group);
-
-        // Add preference rows
-        const anthropicApiKey = new Adw.PasswordEntryRow({
-            title: 'Anthropic',
-        });
-        group.add(anthropicApiKey);
+        page.add(apiPrefGroup);
+        const anthropicApiKey = new Adw.PasswordEntryRow({title: 'Anthropic'});
+        apiPrefGroup.add(anthropicApiKey);
 
         // Bind to GSettings
         const settings = this.getSettings();
         settings.bind('anthropic-api-key', anthropicApiKey, 'text', Gio.SettingsBindFlags.DEFAULT);
+        settings.bind('telemetry-enabled', telemetryRow, 'active', Gio.SettingsBindFlags.DEFAULT);
     }
 }

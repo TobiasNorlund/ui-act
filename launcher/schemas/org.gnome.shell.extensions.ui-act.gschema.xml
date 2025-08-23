@@ -11,5 +11,10 @@
       <summary>Anthropic API Key</summary>
       <description>Stores the API key for accessing Anthropic API.</description>
     </key>
+    <key name="telemetry-enabled" type="b">
+      <default>true</default>
+      <summary>Enable telemetry</summary>
+      <description>Help improve UI Act by sending anonymous telemetry. No keys, screenshots or prompts are sent.</description>
+  </key>
   </schema>
 </schemalist>
