@@ -56,10 +56,11 @@
 }
 
 .ui-act-icon {
-    icon-size: 80px;
-    height: 33px;
-    width: auto;
-    margin: 5px;
+    background-size: contain; 
+    background-repeat: no-repeat; 
+    background-position: center;
+    width: 70px; 
+    height: 26px;
 }
 
 .prompt-input {

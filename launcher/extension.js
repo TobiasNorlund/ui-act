@@ -98,10 +98,9 @@ class LauncherUI extends St.BoxLayout {
 
         let topBar = new St.BoxLayout();
         const svgPath = extension.path + '/images/uiact_gw.svg';
-        const svgFile = Gio.File.new_for_path(svgPath);
-        const svgIcon = new St.Icon({
-            style_class: 'ui-act-icon',
-            gicon: new Gio.FileIcon({ file: svgFile }),
+        const svgIcon = new St.Bin({
+            style_class: "ui-act-icon",
+            style: `background-image: url("${svgPath}");`
         });
         let closeButton = new St.Button({
             style_class: 'close-button',
