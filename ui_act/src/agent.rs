@@ -3,6 +3,7 @@ use serde_json::json;
 use serde::{Serialize, Deserialize};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use uuid::Uuid;
+use std::io::{self, Write};
 use crate::telemetry::post_telemetry;
 use crate::utils::{img_shrink, rgb_image_to_base64_png};
 use crate::env::ComputerEnvironment;
@@ -84,9 +85,7 @@ pub struct AnthropicAgent {
 impl AnthropicAgent {
     pub async fn create() -> Result<Self> {
         let client = reqwest::Client::new();
-        let api_key = std::env::var("ANTHROPIC_API_KEY")
-            .expect("ANTHROPIC_API_KEY environment variable not set");
-        
+        let api_key = std::env::var("ANTHROPIC_API_KEY")?;
         let agent = AnthropicAgent {
             client, 
             api_key,
@@ -208,6 +207,7 @@ impl AnthropicAgent {
             if next_message.content.len() == 0 {
                 // No tool result, ask for user input
                 use std::io::{self, Write};
+                println!("Type a message or press enter to exit...");
                 print!("\n> ");
                 io::stdout().flush()?;
 

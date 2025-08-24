@@ -6,6 +6,7 @@ mod utils;
 mod telemetry;
 
 use std::env as std_env;
+use std::io::{self, Write};
 use crate::agent::AnthropicAgent;
 use crate::telemetry::post_telemetry;
 use crate::env::{ComputerEnvironment, full_desktop::FullDesktopEnvironment, single_window::SingleWindowEnvironment};
@@ -14,8 +15,17 @@ use crate::env::{ComputerEnvironment, full_desktop::FullDesktopEnvironment, sing
 const USAGE: &str = "Usage: ui_act [--window <window_id>] [--no-telemetry] [--help] <prompt>";
 
 
+fn on_error(msg: &str) -> ! {
+    eprintln!("Error: {}", msg);
+    eprintln!("Press Enter to exit...");
+    let _ = io::stdout().flush();
+    let mut _input = String::new();
+    let _ = io::stdin().read_line(&mut _input);
+    std::process::exit(1);
+}
+
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> () {
     
     let mut args = std_env::args();
     let _exe = args.next(); // skip executable name
@@ -34,7 +44,8 @@ async fn main() -> anyhow::Result<()> {
                 send_telemetry = false;
             }
             "--window" => {
-                window_id = args.next().map(|id| id.parse::<u32>()).transpose()?;
+                window_id = args.next().map(|id| id.parse::<u32>()).transpose()
+                    .unwrap_or_else(|_| { on_error("Unable to parse window as int")});
             }
             _ => {
                 prompt = Some(arg);
@@ -43,30 +54,33 @@ async fn main() -> anyhow::Result<()> {
         }
     }
     
-    let prompt = prompt.unwrap_or_else(|| {
-        eprintln!("Error: Missing required prompt argument");
-        eprintln!("{}", USAGE);
-        std::process::exit(1);
-    });
-        
-    let mut sighup_stream = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup())?;
-    let agent = AnthropicAgent::create().await?;
+    let prompt = prompt.unwrap_or_else(|| { on_error("Missing required prompt argument") });
+    let mut sighup_stream = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup())
+        .unwrap_or_else(|e| { on_error(&e.to_string()) });
+    let agent = AnthropicAgent::create().await
+        .unwrap_or_else(|e| { on_error(&e.to_string()) });
     let mut env: Box<dyn ComputerEnvironment> = match window_id {
         Some(wid) => {
             println!("Running in single window mode with window id: {}", wid);
-            Box::new(SingleWindowEnvironment::create(wid)?)
+            let env = SingleWindowEnvironment::create(wid)
+                .unwrap_or_else(|e| { on_error(&e.to_string()) });
+            Box::new(env)
         }
         _ => {
             println!("Running in full desktop mode");
-            Box::new(FullDesktopEnvironment::create()?)
+            let env = FullDesktopEnvironment::create()
+                .unwrap_or_else(|e| { on_error(&e.to_string()) });
+            Box::new(env)
         }
     };
     if send_telemetry {
         post_telemetry(&agent.session_id, &env.name(), "session_start", None, None).await;
     }
-    
+
     tokio::select! {
-        _ = agent.run(&mut env, &prompt, send_telemetry) => {}
+        res = agent.run(&mut env, &prompt, send_telemetry) => {
+            res.unwrap_or_else(|e| { on_error(&e.to_string()) });
+        }
         _ = tokio::signal::ctrl_c() => {
             println!("Received Ctrl-C, shutting down gracefully...");
             if send_telemetry {
@@ -80,6 +94,4 @@ async fn main() -> anyhow::Result<()> {
             }
         }
     }
-
-    Ok(())
 }

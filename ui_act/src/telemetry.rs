@@ -50,7 +50,7 @@ pub async fn post_telemetry(
     event_type: &str, 
     reason: Option<&str>, 
     action_count: Option<u32>
-) {
+) -> () {
     let mut payload = json!({
         "type": event_type,
         "environment": environment,

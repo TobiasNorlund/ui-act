@@ -29,7 +29,7 @@ build-rust:
 
 build-extension:
 	@echo "Preparing GNOME extension..."
-	@# Extension files are already in launcher/ directory
+	cd launcher/schemas && glib-compile-schemas .
 
 build: build-rust build-extension
 
@@ -46,7 +46,7 @@ prepare-install: build
 	cp $(RUST_BINARY) $(BIN_DIR)/ui_act
 	chmod +x $(BIN_DIR)/ui_act
 
-create-deb: prepare-install
+package: prepare-install
 	@echo "Creating debian control files..."
 	
 	@# Create DEBIAN directory
@@ -71,6 +71,16 @@ create-deb: prepare-install
 	@echo "if [ \"\$$1\" = \"configure\" ]; then" >> $(INSTALL_DIR)/DEBIAN/postinst
 	@echo "    echo 'UI Act installed successfully.'" >> $(INSTALL_DIR)/DEBIAN/postinst
 	@echo "    echo 'Enable the GNOME extension with: gnome-extensions enable $(GNOME_EXT_UUID)'" >> $(INSTALL_DIR)/DEBIAN/postinst
+	@echo "" >> $(INSTALL_DIR)/DEBIAN/postinst
+	@echo "    # Configure udev rules for uinput access" >> $(INSTALL_DIR)/DEBIAN/postinst
+	@echo "    UDEV_RULE='KERNEL==\"uinput\", MODE=\"0660\", GROUP=\"input\"'" >> $(INSTALL_DIR)/DEBIAN/postinst
+	@echo "    UDEV_FILE=/etc/udev/rules.d/99-uinput.rules" >> $(INSTALL_DIR)/DEBIAN/postinst
+	@echo "    if ! grep -q \"\$$UDEV_RULE\" \"\$$UDEV_FILE\" 2>/dev/null; then" >> $(INSTALL_DIR)/DEBIAN/postinst
+	@echo "        echo \"Adding udev rule for uinput access...\"" >> $(INSTALL_DIR)/DEBIAN/postinst
+	@echo "        echo \"\$$UDEV_RULE\" >> \"\$$UDEV_FILE\"" >> $(INSTALL_DIR)/DEBIAN/postinst
+	@echo "        udevadm control --reload-rules" >> $(INSTALL_DIR)/DEBIAN/postinst
+	@echo "        udevadm trigger" >> $(INSTALL_DIR)/DEBIAN/postinst
+	@echo "    fi" >> $(INSTALL_DIR)/DEBIAN/postinst
 	@echo "fi" >> $(INSTALL_DIR)/DEBIAN/postinst
 	chmod 755 $(INSTALL_DIR)/DEBIAN/postinst
 	
@@ -83,10 +93,8 @@ create-deb: prepare-install
 	chmod 755 $(INSTALL_DIR)/DEBIAN/prerm
 	
 	@echo "Building deb package..."
-	dpkg-deb --build $(INSTALL_DIR) $(DEB_PACKAGE)
+	dpkg-deb --build --root-owner-group $(INSTALL_DIR) $(DEB_PACKAGE)
 	@echo "Package created: $(DEB_PACKAGE)"
-
-package: create-deb
 
 install: package
 	@echo "Installing deb package..."

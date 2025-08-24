@@ -222,7 +222,7 @@ export default class UIActExtension extends Extension {
                 let decimalValue = parseInt(hexValue, 16);
                 this.run(decimalValue, prompt);
             } else {
-                console.log("No hex value found in description");
+                console.log(`UI-Act: No hex value found in description (${desc})`);
             }
         });
     
@@ -288,7 +288,7 @@ export default class UIActExtension extends Extension {
         if (this.isLauncherVisible)
             return;
 
-        console.log("Showing UI Act launcher");
+        // console.log("Showing UI Act launcher");
         this._root.visible = true;
         this._modal_grab = Main.pushModal(this._root);
 
@@ -317,7 +317,7 @@ export default class UIActExtension extends Extension {
     }
 
     hide() {
-        console.log("Hiding UI Act launcher");
+        // console.log("Hiding UI Act launcher");
         this._root.visible = false;
         if (this._modal_grab)
             Main.popModal(this._modal_grab);
