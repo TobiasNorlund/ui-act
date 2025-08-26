@@ -2,7 +2,7 @@
 
 **UI Act** is a Computer Use/GUI agent software that works alongside you on your Linux desktop. Just press `CTRL + Space`, type your prompt and the agent will kick off — **_using its own mouse and keyboard_** . Have a look:
 
-[TBA: Demo video]
+[Demo](https://github.com/user-attachments/assets/78a4ddf8-f0f2-4c00-85a1-37a2e4bcb55f)
 
 This way, you can still continue working as the agent doesn't hog your mouse. Yet, it allows for a seamless agent handoff as it's working directly in your desktop environment! It works by using [Multi-Pointer X](https://en.wikipedia.org/wiki/Multi-Pointer_X) (MPX), a feature for having multiple mouse pointers in the X windowing system. UI Act is completely free and open source (Apache License 2.0), and you stay in control of your data by providing your own API key. Currently UI Act supports Anthropic as Computer Use backend.
 
