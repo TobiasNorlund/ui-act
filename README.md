@@ -1,4 +1,4 @@
-<font size="2">_Looking for UI Act the model (an early computer use model)? It has been moved here_</font>
+<font size="2">_Looking for UI Act the model (an early computer use model)? It has been moved [here](https://github.com/TobiasNorlund/UI-Act-model)_</font>
 
 ![UI Act](launcher/images/uiact_bw.svg)
 
