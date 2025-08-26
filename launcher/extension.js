@@ -342,7 +342,7 @@ export default class UIActExtension extends Extension {
             let terminalCommand = [
                 'gnome-terminal',
                 '--',
-                'ui_act',
+                'ui-act',
                 '--window',
                 windowId.toString(),
                 ...(sendTelemetry ? [] : ["--no-telemetry"]),

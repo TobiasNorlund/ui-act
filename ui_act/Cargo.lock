@@ -3152,7 +3152,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ui_act"
+name = "ui-act"
 version = "0.1.0"
 dependencies = [
  "anyhow",

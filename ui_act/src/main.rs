@@ -12,7 +12,7 @@ use crate::telemetry::post_telemetry;
 use crate::env::{ComputerEnvironment, full_desktop::FullDesktopEnvironment, single_window::SingleWindowEnvironment};
 
 
-const USAGE: &str = "Usage: ui_act [--window <window_id>] [--no-telemetry] [--help] <prompt>";
+const USAGE: &str = "Usage: ui-act [--window <window_id>] [--no-telemetry] [--help] <prompt>";
 
 
 fn on_error(msg: &str) -> ! {

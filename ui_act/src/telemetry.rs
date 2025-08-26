@@ -73,27 +73,15 @@ pub async fn post_telemetry(
         "payload": payload
     });
 
-    // You can configure the telemetry endpoint via environment variable
     let telemetry_url = std::env::var("UI_ACT_TELEMETRY_ENDPOINT")
         .unwrap_or_else(|_| TELEMETRY_ENDPOINT.to_string());
 
     let client = reqwest::Client::new();
-    let _ = client.post(&telemetry_url)
-        .header("content-type", "application/json")
-        .json(&telemetry_data)
-        .send()
-        .await;
-
-    /*match response {
-        Err(e) => {
-            if verbose {
-                eprintln!("Error sending telemetry: {}", e);
-            }
-        }
-        Ok(resp) => {
-            if !resp.status().is_success() {
-                eprintln!("Telemetry request failed with status: {}", resp.status());
-            }
-        }
-    }*/
+    tokio::spawn(async move {
+        let _ = client.post(&telemetry_url)
+            .header("content-type", "application/json")
+            .json(&telemetry_data)
+            .send()
+            .await;
+    });
 }

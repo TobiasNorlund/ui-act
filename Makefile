@@ -8,7 +8,7 @@ INSTALL_DIR = $(BUILD_DIR)/install
 DEBIAN_DIR = $(BUILD_DIR)/debian
 
 RUST_TARGET = release
-RUST_BINARY = ui_act/target/$(RUST_TARGET)/ui_act
+RUST_BINARY = ui_act/target/$(RUST_TARGET)/ui-act
 
 GNOME_EXT_UUID = ui-act@tobiasnorlund.github.com
 GNOME_EXT_DIR = $(INSTALL_DIR)/usr/share/gnome-shell/extensions/$(GNOME_EXT_UUID)
@@ -43,8 +43,7 @@ prepare-install: build
 	cp -r launcher/* $(GNOME_EXT_DIR)/
 	
 	@echo "Copying Rust binary..."
-	cp $(RUST_BINARY) $(BIN_DIR)/ui_act
-	chmod +x $(BIN_DIR)/ui_act
+	cp $(RUST_BINARY) $(BIN_DIR)/ui-act
 
 package: prepare-install
 	@echo "Creating debian control files..."
