@@ -14,7 +14,8 @@ UI Act currently only runs on Ubuntu Desktop 24.04 and later, and is distributed
 
 ```bash
 # Download and install deb package file
-sudo apt install <path to ui-act deb file>
+wget https://github.com/TobiasNorlund/ui-act/releases/download/v0.1.0/ui-act_0.1.0_amd64.deb
+sudo apt install ./ui-act_0.1.0_amd64.deb
 
 # Add your user to the "input" group. This is necessary for your user to be able to create and use UInput devices
 sudo usermod -aG input $USER
