@@ -69,11 +69,57 @@ pub fn run_xinput(args: &[&str]) -> Result<()> {
     Ok(())
 }
 
+
+// General Device Statics
+pub static SYNC_DELAY: Duration = Duration::from_micros(1); // should relinquish thread control to read the last sync report
+
+
+// Mouse Device Statics
+
+static CLICK_DELAY: Duration = Duration::from_millis(100);
+static MULTI_CLICK_DELAY: Duration = Duration::from_millis(50);
+
+pub enum MouseButton {
+    Left,
+    Right,
+    Middle,
+}
+
+pub enum ScrollDirection {
+    Up,
+    Down,
+    Right,
+    Left,
+}
+
+impl ScrollDirection {
+    pub fn from_str(direction: &str) -> Result<Self> {
+        match direction {
+            "up" => Ok(ScrollDirection::Up),
+            "down" => Ok(ScrollDirection::Down),
+            "right" => Ok(ScrollDirection::Right),
+            "left" => Ok(ScrollDirection::Left),
+            _ => Err(anyhow!("Invalid scroll direction: {}", direction)),
+        }
+    }
+
+    pub fn multiplier(&self) -> i32 {
+        match self {
+            ScrollDirection::Up => 1,
+            ScrollDirection::Down => -1,
+            ScrollDirection::Right => 1,
+            ScrollDirection::Left => -1,
+        }
+    }
+}
+
 pub struct MouseDevice {
     pub id: i32,
     pub name: String,
     device: uinput::Device
 }
+
+
 
 impl MouseDevice {
     pub fn create(name: &str, width: i32, height: i32) -> Result<Self> {
@@ -82,6 +128,9 @@ impl MouseDevice {
 
         builder = builder.event(uinput::event::controller::Controller::Mouse(uinput::event::controller::Mouse::Left))?;
         builder = builder.event(uinput::event::controller::Controller::Mouse(uinput::event::controller::Mouse::Right))?;
+        builder = builder.event(uinput::event::controller::Controller::Mouse(uinput::event::controller::Mouse::Middle))?;
+        builder = builder.event(uinput::event::relative::Relative::Wheel(uinput::event::relative::Wheel::Horizontal))?;
+        builder = builder.event(uinput::event::relative::Relative::Wheel(uinput::event::relative::Wheel::Vertical))?;
         builder = builder.event(uinput::event::absolute::Absolute::Position(uinput::event::absolute::Position::X))?
             .min(0)
             .max(width)
@@ -114,54 +163,107 @@ impl MouseDevice {
         Ok(())
     }
 
-    pub fn left_click(&mut self) -> Result<()> {
-        self.device
-            .send(uinput::event::controller::Controller::Mouse(uinput::event::controller::Mouse::Left), 1)?;
-        self.device.synchronize()?;
-        thread::sleep(Duration::from_millis(100));
-        self.device
-            .send(uinput::event::controller::Controller::Mouse(uinput::event::controller::Mouse::Left), 0)?;
+    pub fn scroll(&mut self, scroll_direction: ScrollDirection, amount: u32) -> Result<()> {
+        /* 
+        uinput lib incorrectly uses legacy wheel values 0x06 (REL_HWHEEL) and 0x08 (REL_WHEEL)
+        and should use the Hi-Res values 0x0b (REL_HWHEEL_HI_RES) and 0x0c (REL_WHEEL_HI_RES) instead
+        when possible. Something for the future to fix?
+
+        Documentation for kernel 6.8 (shipped with Ubuntu 24.04)
+        ref: https://github.com/torvalds/linux/blob/v6.8/include/uapi/linux/input-event-codes.h#L833
+        */
+        let wheel = match scroll_direction {
+            ScrollDirection::Up => uinput::event::relative::Wheel::Vertical,
+            ScrollDirection::Down => uinput::event::relative::Wheel::Vertical,
+            ScrollDirection::Right => uinput::event::relative::Wheel::Horizontal,
+            ScrollDirection::Left => uinput::event::relative::Wheel::Horizontal,
+        };
+        self.device.send(uinput::event::relative::Relative::Wheel(wheel), amount as i32 * scroll_direction.multiplier())?;
         self.device.synchronize()?;
         Ok(())
     }
 
-    pub fn right_click(&mut self) -> Result<()> {
-        self.device
-            .send(uinput::event::controller::Controller::Mouse(uinput::event::controller::Mouse::Right), 1)?;
+    fn mouse_button_down(&mut self, button: uinput::event::controller::Mouse) -> Result<()> {
+        let send_result = self.device.send(uinput::event::controller::Controller::Mouse(button), 1);
         self.device.synchronize()?;
-        thread::sleep(Duration::from_millis(100));
-        self.device
-            .send(uinput::event::controller::Controller::Mouse(uinput::event::controller::Mouse::Right), 0)?;
+        thread::sleep(SYNC_DELAY);
+        Ok(())
+    }
+
+    fn mouse_button_up(&mut self, button: uinput::event::controller::Mouse) -> Result<()> {
+        let send_result = self.device.send(uinput::event::controller::Controller::Mouse(button), 0);
         self.device.synchronize()?;
+        thread::sleep(SYNC_DELAY);
+        Ok(())
+    }
+    
+
+
+    pub fn mouse_down(&mut self, button: MouseButton) -> Result<()> {
+        let button = match button {
+            MouseButton::Left => uinput::event::controller::Mouse::Left,
+            MouseButton::Right => uinput::event::controller::Mouse::Right,
+            MouseButton::Middle => uinput::event::controller::Mouse::Middle,
+        };
+        self.mouse_button_down(button)?;
+        Ok(())
+    }
+    
+    pub fn mouse_up(&mut self, button: MouseButton) -> Result<()> {
+        let button = match button {
+            MouseButton::Left => uinput::event::controller::Mouse::Left,
+            MouseButton::Right => uinput::event::controller::Mouse::Right,
+            MouseButton::Middle => uinput::event::controller::Mouse::Middle,
+        };
+        self.mouse_button_up(button)?;
+        Ok(())
+    }
+    
+    pub fn click(&mut self, button: MouseButton) -> Result<()> {
+        let button = &match button {
+            MouseButton::Left => uinput::event::controller::Mouse::Left,
+            MouseButton::Right => uinput::event::controller::Mouse::Right,
+            MouseButton::Middle => uinput::event::controller::Mouse::Middle,
+        };
+        self.mouse_button_down(*button)?;
+        thread::sleep(CLICK_DELAY);
+        self.mouse_button_up(*button)?;
+        Ok(())
+    }
+
+    pub fn click_drag(&mut self, button: MouseButton, x: u32, y: u32) -> Result<()> {
+        let button = &match button {
+            MouseButton::Left => uinput::event::controller::Mouse::Left,
+            MouseButton::Right => uinput::event::controller::Mouse::Right,
+            MouseButton::Middle => uinput::event::controller::Mouse::Middle,
+        };
+        self.mouse_button_down(*button)?;
+        thread::sleep(CLICK_DELAY);
+        self.mouse_move(x, y)?;
+        thread::sleep(CLICK_DELAY);
+        self.mouse_button_up(*button)?;
         Ok(())
     }
 
     pub fn double_click(&mut self) -> Result<()> {
-        // First click
-        self.device
-            .send(uinput::event::controller::Controller::Mouse(uinput::event::controller::Mouse::Left), 1)?;
-        self.device.synchronize()?;
-        thread::sleep(Duration::from_millis(50));
-        self.device
-            .send(uinput::event::controller::Controller::Mouse(uinput::event::controller::Mouse::Left), 0)?;
-        self.device.synchronize()?;
-        
-        // Small delay between clicks for double-click recognition
-        thread::sleep(Duration::from_millis(50));
-        
-        // Second click
-        self.device
-            .send(uinput::event::controller::Controller::Mouse(uinput::event::controller::Mouse::Left), 1)?;
-        self.device.synchronize()?;
-        thread::sleep(Duration::from_millis(50));
-        self.device
-            .send(uinput::event::controller::Controller::Mouse(uinput::event::controller::Mouse::Left), 0)?;
-        self.device.synchronize()?;
-        
+        self.click(MouseButton::Left)?;
+        thread::sleep(MULTI_CLICK_DELAY);
+        self.click(MouseButton::Left)?;
+        Ok(())
+    }
+
+    pub fn triple_click(&mut self) -> Result<()> {
+        self.click(MouseButton::Left)?;
+        thread::sleep(MULTI_CLICK_DELAY);
+        self.click(MouseButton::Left)?;
+        thread::sleep(MULTI_CLICK_DELAY);
+        self.click(MouseButton::Left)?;
         Ok(())
     }
 }
 
+
+static KEY_PRESS_DELAY: Duration = Duration::from_millis(50);
 
 pub struct KeyboardDevice {
     pub id: i32,
@@ -174,26 +276,7 @@ impl KeyboardDevice {
         let mut builder = uinput::default()?
             .name(name)?;
 
-        for key in [
-            uinput::event::keyboard::Key::A, uinput::event::keyboard::Key::B, uinput::event::keyboard::Key::C, uinput::event::keyboard::Key::D, uinput::event::keyboard::Key::E, uinput::event::keyboard::Key::F, uinput::event::keyboard::Key::G, uinput::event::keyboard::Key::H, uinput::event::keyboard::Key::I, uinput::event::keyboard::Key::J,
-            uinput::event::keyboard::Key::K, uinput::event::keyboard::Key::L, uinput::event::keyboard::Key::M, uinput::event::keyboard::Key::N, uinput::event::keyboard::Key::O, uinput::event::keyboard::Key::P, uinput::event::keyboard::Key::Q, uinput::event::keyboard::Key::R, uinput::event::keyboard::Key::S, uinput::event::keyboard::Key::T,
-            uinput::event::keyboard::Key::U, uinput::event::keyboard::Key::V, uinput::event::keyboard::Key::W, uinput::event::keyboard::Key::X, uinput::event::keyboard::Key::Y, uinput::event::keyboard::Key::Z,
-            uinput::event::keyboard::Key::_1, uinput::event::keyboard::Key::_2, uinput::event::keyboard::Key::_3, uinput::event::keyboard::Key::_4, uinput::event::keyboard::Key::_5, uinput::event::keyboard::Key::_6, uinput::event::keyboard::Key::_7, uinput::event::keyboard::Key::_8, uinput::event::keyboard::Key::_9, uinput::event::keyboard::Key::_0,
-            uinput::event::keyboard::Key::Space, uinput::event::keyboard::Key::Dot, uinput::event::keyboard::Key::Comma,
-            uinput::event::keyboard::Key::LeftControl, uinput::event::keyboard::Key::RightControl,
-            uinput::event::keyboard::Key::LeftAlt, uinput::event::keyboard::Key::RightAlt,
-            uinput::event::keyboard::Key::LeftShift, uinput::event::keyboard::Key::RightShift,
-            uinput::event::keyboard::Key::LeftMeta, uinput::event::keyboard::Key::RightMeta,
-            uinput::event::keyboard::Key::Tab, uinput::event::keyboard::Key::Enter, uinput::event::keyboard::Key::Esc,
-            uinput::event::keyboard::Key::BackSpace, uinput::event::keyboard::Key::Delete,
-            uinput::event::keyboard::Key::Home, uinput::event::keyboard::Key::End,
-            uinput::event::keyboard::Key::PageUp, uinput::event::keyboard::Key::PageDown,
-            uinput::event::keyboard::Key::Insert,
-            uinput::event::keyboard::Key::F1, uinput::event::keyboard::Key::F2, uinput::event::keyboard::Key::F3,
-            uinput::event::keyboard::Key::F4, uinput::event::keyboard::Key::F5, uinput::event::keyboard::Key::F6,
-            uinput::event::keyboard::Key::F7, uinput::event::keyboard::Key::F8, uinput::event::keyboard::Key::F9,
-            uinput::event::keyboard::Key::F10, uinput::event::keyboard::Key::F11, uinput::event::keyboard::Key::F12,
-        ] {
+        for key in uinput::event::keyboard::Key::iter_variants() {
             builder = builder.event(key)?;
         }
 
@@ -219,23 +302,47 @@ impl KeyboardDevice {
             }
             // Press all modifier keys except the last (main) key
             for key in &keys[..keys.len().saturating_sub(1)] {
-                self.device.send(*key, 1)?;
-                self.device.synchronize()?;
+                self.key_down(*key)?;
             }
             // Press the main key
             let main_key = keys.last().unwrap();
-            self.device.send(*main_key, 1)?;
-            self.device.synchronize()?;
-            thread::sleep(Duration::from_millis(50));
+            self.key_down(*main_key)?;
+
+            thread::sleep(KEY_PRESS_DELAY);
+            
             // Release the main key
-            self.device.send(*main_key, 0)?;
-            self.device.synchronize()?;
+            self.key_up(*main_key)?;
             // Release modifiers in reverse order
             for key in keys[..keys.len().saturating_sub(1)].iter().rev() {
-                self.device.send(*key, 0)?;
-                self.device.synchronize()?;
+                self.key_up(*key)?;
             }
-            thread::sleep(Duration::from_millis(50));
+            thread::sleep(KEY_PRESS_DELAY);
+        }
+        Ok(())
+    }
+
+    fn key_down(&mut self, key: uinput::event::keyboard::Key) -> Result<()> {
+        self.device.send(key, 1)?;
+        self.device.synchronize()?;
+        Ok(())
+    }
+    
+    fn key_up(&mut self, key: uinput::event::keyboard::Key) -> Result<()> {
+        self.device.send(key, 0)?;
+        self.device.synchronize()?;
+        Ok(())
+    }
+
+    pub fn hold_key(&mut self, key_combination: &str, duration: Duration) -> Result<()> {
+        let keys = parse_key_combination(key_combination)?;
+        for key in keys.keys.iter() {
+            self.key_down(*key)?;
+        }
+
+        thread::sleep(duration);
+
+        for key in keys.keys.iter().rev() {
+            self.key_up(*key)?;
         }
         Ok(())
     }
@@ -244,16 +351,14 @@ impl KeyboardDevice {
         let keys = parse_key_combination(key_combination)?;
         
         // Press all keys in sequence
-        for key in &keys.keys {
-            self.device.send(*key, 1)?;
-            self.device.synchronize()?;
+        for key in keys.keys.iter() {
+            self.key_down(*key)?;
         }
-        thread::sleep(Duration::from_millis(50));
+        thread::sleep(KEY_PRESS_DELAY);
         
         // Release all keys in reverse sequence
         for key in keys.keys.iter().rev() {
-            self.device.send(*key, 0)?;
-            self.device.synchronize()?;
+            self.key_up(*key)?;
         }
         
         Ok(())
@@ -277,6 +382,19 @@ fn parse_key_combination(combination: &str) -> Result<KeyCombination> {
             "alt" => Key::LeftAlt,
             "shift" => Key::LeftShift,
             "meta" | "win" | "super" => Key::LeftMeta,
+            "0" => Key::_0,
+            "1" => Key::_1,
+            "2" => Key::_2,
+            "3" => Key::_3,
+            "4" => Key::_4,
+            "5" => Key::_5,
+            "6" => Key::_6,
+            "7" => Key::_7,
+            "8" => Key::_8,
+            "9" => Key::_9,
+            "." => Key::Dot,
+            "," => Key::Comma,
+            " " => Key::Space,
             "a" => Key::A,
             "b" => Key::B,
             "c" => Key::C,
@@ -339,51 +457,54 @@ fn char_to_keys(c: char) -> Vec<uinput::event::keyboard::Key> {
     if c.is_uppercase() {
         keys.push(Key::LeftShift)
     }
-    let key  = match c.to_ascii_lowercase() {
-        'a' => Some(Key::A),
-        'b' => Some(Key::B),
-        'c' => Some(Key::C),
-        'd' => Some(Key::D),
-        'e' => Some(Key::E),
-        'f' => Some(Key::F),
-        'g' => Some(Key::G),
-        'h' => Some(Key::H),
-        'i' => Some(Key::I),
-        'j' => Some(Key::J),
-        'k' => Some(Key::K),
-        'l' => Some(Key::L),
-        'm' => Some(Key::M),
-        'n' => Some(Key::N),
-        'o' => Some(Key::O),
-        'p' => Some(Key::P),
-        'q' => Some(Key::Q),
-        'r' => Some(Key::R),
-        's' => Some(Key::S),
-        't' => Some(Key::T),
-        'u' => Some(Key::U),
-        'v' => Some(Key::V),
-        'w' => Some(Key::W),
-        'x' => Some(Key::X),
-        'y' => Some(Key::Y),
-        'z' => Some(Key::Z),
-        '1' => Some(Key::_1),
-        '2' => Some(Key::_2),
-        '3' => Some(Key::_3),
-        '4' => Some(Key::_4),
-        '5' => Some(Key::_5),
-        '6' => Some(Key::_6),
-        '7' => Some(Key::_7),
-        '8' => Some(Key::_8),
-        '9' => Some(Key::_9),
-        '0' => Some(Key::_0),
-        ' ' => Some(Key::Space),
-        '.' => Some(Key::Dot),
-        ',' => Some(Key::Comma),
-        '\n' => Some(Key::Enter),
-        _ => None
+    match c.to_ascii_lowercase() {
+        'a' => keys.push(Key::A),
+        'b' => keys.push(Key::B),
+        'c' => keys.push(Key::C),
+        'd' => keys.push(Key::D),
+        'e' => keys.push(Key::E),
+        'f' => keys.push(Key::F),
+        'g' => keys.push(Key::G),
+        'h' => keys.push(Key::H),
+        'i' => keys.push(Key::I),
+        'j' => keys.push(Key::J),
+        'k' => keys.push(Key::K),
+        'l' => keys.push(Key::L),
+        'm' => keys.push(Key::M),
+        'n' => keys.push(Key::N),
+        'o' => keys.push(Key::O),
+        'p' => keys.push(Key::P),
+        'q' => keys.push(Key::Q),
+        'r' => keys.push(Key::R),
+        's' => keys.push(Key::S),
+        't' => keys.push(Key::T),
+        'u' => keys.push(Key::U),
+        'v' => keys.push(Key::V),
+        'w' => keys.push(Key::W),
+        'x' => keys.push(Key::X),
+        'y' => keys.push(Key::Y),
+        'z' => keys.push(Key::Z),
+        '1' => keys.push(Key::_1),
+        '2' => keys.push(Key::_2),
+        '3' => keys.push(Key::_3),
+        '4' => keys.push(Key::_4),
+        '5' => keys.push(Key::_5),
+        '6' => keys.push(Key::_6),
+        '7' => keys.push(Key::_7),
+        '8' => keys.push(Key::_8),
+        '9' => keys.push(Key::_9),
+        '0' => keys.push(Key::_0),
+        ' ' => keys.push(Key::Space),
+        '.' => keys.push(Key::Dot),
+        ';' => keys.push(Key::SemiColon),
+        ':' => {keys.push(Key::LeftShift); keys.push(Key::SemiColon)},
+        '-' => keys.push(Key::Minus),
+        '_' => {keys.push(Key::LeftShift); keys.push(Key::Minus)},
+        ',' => keys.push(Key::Comma),
+        '/' => keys.push(Key::Slash),
+        '?' => {keys.push(Key::LeftShift); keys.push(Key::Slash)},
+        '\n' => keys.push(Key::Enter),
+        _ => ()
     };
-    if key.is_some() {
-        keys.push(key.unwrap());
-    }
     keys
 }

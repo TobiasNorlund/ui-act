@@ -7,7 +7,7 @@ use std::io::{self, Write};
 use crate::telemetry::post_telemetry;
 use crate::utils::{img_shrink, rgb_image_to_base64_png};
 use crate::env::ComputerEnvironment;
-
+use std::time::Duration;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct ApiResponse {
@@ -55,10 +55,24 @@ pub enum ToolInput {
     RightClick { coordinate: [u32; 2] },
     #[serde(rename = "double_click")]
     DoubleClick { coordinate: [u32; 2] },
+    #[serde(rename = "triple_click")]
+    TripleClick { coordinate: [u32; 2] },
     #[serde(rename = "type")]
     Type { text: String },
     #[serde(rename = "key")]
-    Key { text: String }
+    Key { text: String },
+    #[serde(rename = "scroll")]
+    Scroll { scroll_direction: String, scroll_amount: u32 },
+    #[serde(rename = "hold_key")]
+    HoldKey { text: String, duration: u32 },
+    #[serde(rename = "left_mouse_down")]
+    LeftMouseDown,
+    #[serde(rename = "left_mouse_up")]
+    LeftMouseUp,
+    #[serde(rename = "left_click_drag")]
+    LeftClickDrag { coordinate: [u32; 2] },
+    #[serde(rename = "wait")]
+    Wait { duration: u32 },
     // TODO: Fill out
 }
 
@@ -132,8 +146,8 @@ impl AnthropicAgent {
             let mut next_message = Message {
                 role: "user".to_string(),
                 content: vec![]
-            };
-            for block in &res.content {
+                };
+                for block in &res.content {
                 match block {
                     ContentBlock::Text {text} => {
                         println!("\nUI-Act:\n{}", text);
@@ -161,11 +175,37 @@ impl AnthropicAgent {
                                     env.mouse_move(x, y)?;
                                     env.double_click()?;
                                 }
+                                ToolInput::TripleClick { coordinate } => {
+                                    let x = (coordinate[0] as f32 / scale).round() as u32;
+                                    let y = (coordinate[1] as f32 / scale).round() as u32;
+                                    env.mouse_move(x, y)?;
+                                    env.triple_click()?;
+                                }
                                 ToolInput::Type { text } => {
                                     env.type_text(&text)?;
                                 }
                                 ToolInput::Key { text } => {
                                     env.press_key(text)?;
+                                }
+                                ToolInput::Scroll { scroll_direction, scroll_amount } => {
+                                    env.scroll(scroll_direction, *scroll_amount)?;
+                                }
+                                ToolInput::HoldKey { text, duration } => {
+                                    env.hold_key(text, Duration::from_secs(*duration as u64))?;
+                                }
+                                ToolInput::LeftMouseDown => {
+                                    env.left_mouse_down()?;
+                                }
+                                ToolInput::LeftMouseUp => {
+                                    env.left_mouse_up()?;
+                                }
+                                ToolInput::LeftClickDrag { coordinate } => {
+                                    let x = (coordinate[0] as f32 / scale).round() as u32;
+                                    let y = (coordinate[1] as f32 / scale).round() as u32;
+                                    env.left_click_drag(x, y)?;
+                                }
+                                ToolInput::Wait { duration } => {
+                                    env.wait(Duration::from_secs(*duration as u64))?;
                                 }
                                 ToolInput::Screenshot => {
                                     // Do nothing, screenshot will be provided below
