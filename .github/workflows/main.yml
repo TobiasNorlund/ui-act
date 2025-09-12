@@ -17,5 +17,17 @@ jobs:
       # Set api key and disable telemetry
       - run: gsettings --schemadir /usr/share/gnome-shell/extensions/ui-act@tobiasnorlund.github.com/schemas set org.gnome.shell.extensions.ui-act telemetry-enabled false
       - run: gsettings --schemadir /usr/share/gnome-shell/extensions/ui-act@tobiasnorlund.github.com/schemas set org.gnome.shell.extensions.ui-act anthropic-api-key ${{ secrets.ANTHROPIC_API_KEY }}
-      # Test setting
-      - run: gsettings --schemadir /usr/share/gnome-shell/extensions/ui-act@tobiasnorlund.github.com/schemas get org.gnome.shell.extensions.ui-act telemetry-enabled
+      # Start a calculator and launch UI-Act on it
+      - run: DISPLAY=:0 gnome-calculator & sleep 5
+      - run: DISPLAY=:0 xdotool key ctrl+space && DISPLAY=:0 xdotool type 'Calculate 3+4'
+      # Save screenshot
+      - run: DISPLAY=:0 scrot screen.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-act-launcher-screen
+          path: screen.png
+      - run: DISPLAY=:0 xdotool key Return && sleep 30 && DISPLAY=:0 scrot screen.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: result-screen
+          path: screen.png
