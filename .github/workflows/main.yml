@@ -1,0 +1,13 @@
+name: UI-Act Tests
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-tests:
+    runs-on: proxmox
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Now running inside the VM!"
+      - run: uname -a
+      - run: make package
