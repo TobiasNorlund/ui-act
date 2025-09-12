@@ -18,7 +18,7 @@ jobs:
       - run: gsettings --schemadir /usr/share/gnome-shell/extensions/ui-act@tobiasnorlund.github.com/schemas set org.gnome.shell.extensions.ui-act telemetry-enabled false
       - run: gsettings --schemadir /usr/share/gnome-shell/extensions/ui-act@tobiasnorlund.github.com/schemas set org.gnome.shell.extensions.ui-act anthropic-api-key ${{ secrets.ANTHROPIC_API_KEY }}
       # Start a calculator and launch UI-Act on it
-      - run: DISPLAY=:0 gnome-calculator & sleep 5
+      - run: DISPLAY=:0 gnome-calculator & while ! DISPLAY=:0 xdotool search --class "gnome-calculator" > /dev/null 2>&1; do  sleep 5; done
       - run: DISPLAY=:0 xdotool key ctrl+space && DISPLAY=:0 xdotool type 'Calculate 3+4'
       # Save screenshot
       - run: DISPLAY=:0 scrot screen.png
