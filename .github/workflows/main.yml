@@ -8,11 +8,10 @@ jobs:
     runs-on: proxmox
     steps:
       - uses: actions/checkout@v4
-      - run: echo $DBUS_SESSION_BUS_ADDRESS $XDG_RUNTIME_DIR && ls -l $XDG_RUNTIME_DIR/bus
       # Build deb package
-      #- run: make package
+      - run: make package
       # Install deb
-      #- run: sudo apt install ./ui-act_*.deb
+      - run: sudo apt install ./ui-act_*.deb
       # Restart gnome before the extension can be enabled (sleep for gdm to restart properly)
       - run: sudo systemctl restart gdm3 && sleep 60 && gnome-extensions enable ui-act@tobiasnorlund.github.com
       # Set api key and disable telemetry
@@ -21,14 +20,15 @@ jobs:
       # Start a calculator and launch UI-Act on it
       - run: DISPLAY=:0 gnome-calculator & sleep 5
       - run: DISPLAY=:0 xdotool key ctrl+space && sleep 2 && DISPLAY=:0 xdotool type 'Calculate 3+4' && sleep 1
-      # Save screenshot
-      - run: DISPLAY=:0 scrot screen.png
+      # Save launcher screenshot before kicking off
+      - run: DISPLAY=:0 scrot launcher-screen.png
       - uses: actions/upload-artifact@v4
         with:
           name: ui-act-launcher-screen
-          path: screen.png
-      - run: DISPLAY=:0 xdotool key Return && sleep 30 && DISPLAY=:0 scrot screen.png
+          path: launcher-screen.png
+      # Hit enter to kick off agent, wait 30s and take screenshot to inspect result
+      - run: DISPLAY=:0 xdotool key Return && sleep 30 && DISPLAY=:0 scrot result-screen.png && sleep 1
       - uses: actions/upload-artifact@v4
         with:
           name: result-screen
-          path: screen.png
+          path: result-screen.png
