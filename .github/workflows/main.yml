@@ -3,10 +3,6 @@ name: UI-Act Tests
 on:
   workflow_dispatch:
 
-permissions:
-  actions: read
-  contents: read
-
 jobs:
 
   create-vm:
