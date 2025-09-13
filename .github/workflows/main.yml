@@ -26,7 +26,7 @@ jobs:
         with:
           name: ui-act-launcher-screen
           path: screen.png
-      - run: DISPLAY=:0 xdotool key Return && sleep 30 && DISPLAY=:0 scrot screen.png
+      - run: DISPLAY=:0 xdotool key Return && sleep 100 && DISPLAY=:0 scrot screen.png
       - uses: actions/upload-artifact@v4
         with:
           name: result-screen
