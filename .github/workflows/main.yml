@@ -4,6 +4,47 @@ on:
   workflow_dispatch:
 
 jobs:
+
+  create-vm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone template VM
+        id: clone
+        run: |
+          VMID=$((2000 + RANDOM % 1000))
+          NAME=gha-${{ github.run_id }}
+          curl -vkf -X POST "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/114/clone" \
+            -H 'Authorization: PVEAPIToken=gha@pve!gha-token=${{ secrets.PVE_TOKEN }}' \
+            -d "newid=$VMID" \
+            -d "name=$NAME" \
+            -d "target=alix"
+          sleep 5
+          echo "vmid=$VMID" >> $GITHUB_OUTPUT
+      - name: Start VM
+        run: |
+          curl -vkf -X POST "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/200/status/start" \
+            -H 'Authorization: PVEAPIToken=gha@pve!gha-token=${{ secrets.PVE_TOKEN }}'
+      - name: Wait for runner to connect
+        run: |
+          echo "Waiting for GitHub runner..."
+          for i in {1..30}; do
+            RUNNERS=$(gh api repos/${{ github.repository }}/actions/runners \
+              -q '.runners[].name')
+            echo "Currently registered: $RUNNERS"
+            if echo "$RUNNERS" | grep -q "gha-${{ github.run_id }}"; then
+              echo "Runner connected!"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Runner did not connect in time" >&2
+          exit 1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            
+    outputs:
+      vmid: ${{ steps.clone.outputs.vmid }}
+
   run-tests:
     runs-on: proxmox
     steps:
