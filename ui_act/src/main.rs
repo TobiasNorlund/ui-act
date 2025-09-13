@@ -24,12 +24,38 @@ fn on_error(msg: &str) -> ! {
     std::process::exit(1);
 }
 
+#[cfg(target_os = "linux")]
+fn get_signal_handler() -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut sighup_stream = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup())
+        .unwrap_or_else(|e| { on_error(&e.to_string()) });
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {
+                println!("Received Ctrl-C, shutting down gracefully...");
+            }
+            _ = sighup_stream.recv() => {
+                println!("Received SIGHUP, shutting down gracefully...");
+            }
+        }
+    })
+}
+
+#[cfg(not(target_os = "linux"))]
+fn get_signal_handler() -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        tokio::signal::ctrl_c().await;
+        println!("Received Ctrl-C, shutting down gracefully...");
+    })
+}
+
+
 #[tokio::main]
 async fn main() -> () {
-    
+
+    let signal_handle = get_signal_handler();
+
     let mut args = std_env::args();
     let _exe = args.next(); // skip executable name
-    
     let mut window_id = None;
     let mut prompt = None;
     let mut send_telemetry: bool = true;
@@ -55,8 +81,7 @@ async fn main() -> () {
     }
     
     let prompt = prompt.unwrap_or_else(|| { on_error("Missing required prompt argument") });
-    let mut sighup_stream = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup())
-        .unwrap_or_else(|e| { on_error(&e.to_string()) });
+    
     let agent = AnthropicAgent::create().await
         .unwrap_or_else(|e| { on_error(&e.to_string()) });
     let mut env: Box<dyn ComputerEnvironment> = match window_id {
@@ -77,21 +102,14 @@ async fn main() -> () {
         post_telemetry(&agent.session_id, &env.name(), "session_start", None, None).await;
     }
 
-    tokio::select! {
-        res = agent.run(&mut env, &prompt, send_telemetry) => {
-            res.unwrap_or_else(|e| { on_error(&e.to_string()) });
-        }
-        _ = tokio::signal::ctrl_c() => {
-            println!("Received Ctrl-C, shutting down gracefully...");
-            if send_telemetry {
-                post_telemetry(&agent.session_id, &env.name(), "session_end", Some("interrupted"), Some(agent.action_count.get())).await;
+        tokio::select! {
+            res = agent.run(&mut env, &prompt, send_telemetry) => {
+                res.unwrap_or_else(|e| { on_error(&e.to_string()) });
             }
-        }
-        _ = sighup_stream.recv() => {
-            println!("Received SIGHUP, shutting down gracefully...");
-            if send_telemetry {
-                post_telemetry(&agent.session_id, &env.name(), "session_end", Some("interrupted"), Some(agent.action_count.get())).await;
+            _ = signal_handle => {
+                if send_telemetry {
+                    post_telemetry(&agent.session_id, &env.name(), "session_end", Some("interrupted"), Some(agent.action_count.get())).await;
+                }
             }
-        }
     }
 }

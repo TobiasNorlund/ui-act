@@ -7,6 +7,8 @@ use x11rb::connection::Connection;
 use crate::input::MPXInput;
 use crate::env::ComputerEnvironment;
 use crate::utils::get_first_monitor;
+use crate::device::{MouseButton, ScrollDirection};
+use std::time::Duration;
 
 pub struct SingleWindowEnvironment {
     input: MPXInput,
@@ -131,16 +133,53 @@ impl ComputerEnvironment for SingleWindowEnvironment {
         self.input.mouse.mouse_move(geom.x as u32 + x, geom.y as u32 + y)
     }
 
+    fn cursor_position(&mut self) -> Result<(u32, u32)> {
+        Ok((0, 0)) // todo: implement
+    }
+
+    fn left_mouse_down(&mut self) -> Result<()> {
+        self.input.mouse.mouse_down(MouseButton::Left)
+    }
+
+    fn left_mouse_up(&mut self) -> Result<()> {
+        self.input.mouse.mouse_up(MouseButton::Left)
+    }
+
+    fn left_click_drag(&mut self, x: u32, y: u32) -> Result<()> {
+        self.input.mouse.click_drag(MouseButton::Left, x, y)
+    }
+
     fn left_click(&mut self) -> Result<()> {
-        self.input.mouse.left_click()
+        self.input.mouse.click(MouseButton::Left)
     }
 
     fn right_click(&mut self) -> Result<()> {
-        self.input.mouse.right_click()
+        self.input.mouse.click(MouseButton::Right)
+    }
+
+    fn middle_click(&mut self) -> Result<()> {
+        self.input.mouse.click(MouseButton::Middle)
     }
 
     fn double_click(&mut self) -> Result<()> {
         self.input.mouse.double_click()
+    }
+
+    fn triple_click(&mut self) -> Result<()> {
+        self.input.mouse.triple_click()
+    }
+
+    fn wait(&mut self, duration: Duration) -> Result<()> {
+        std::thread::sleep(duration);
+        Ok(())
+    }
+
+    fn scroll(&mut self, direction: &str, amount: u32) -> Result<()> {
+        self.input.mouse.scroll(ScrollDirection::from_str(direction)?, amount)
+    }
+
+    fn hold_key(&mut self, key: &str, duration: Duration) -> Result<()> {
+        self.input.keyboard.hold_key(key, duration)
     }
 
     fn type_text(&mut self, text: &str) -> Result<()> {
@@ -150,6 +189,7 @@ impl ComputerEnvironment for SingleWindowEnvironment {
     fn press_key(&mut self, key_combination: &str) -> Result<()> {
         self.input.keyboard.press_key(key_combination)
     }
+
 }
 
 impl Drop for SingleWindowEnvironment {
