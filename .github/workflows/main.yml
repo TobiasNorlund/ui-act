@@ -45,7 +45,7 @@ jobs:
           echo "Timeout: Runner did not become available" >&2
           exit 1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
             
     outputs:
       vmid: ${{ steps.clone.outputs.vmid }}
