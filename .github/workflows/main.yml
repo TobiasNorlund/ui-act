@@ -86,7 +86,7 @@ jobs:
     steps:
       - name: Stop VM
         run: |
-          VMID=${{ needs.prepare-vm.outputs.vmid }}
+          VMID=${{ needs.create-vm.outputs.vmid }}
           curl -vkf -X POST "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/$VMID/status/stop" \
             -H 'Authorization: PVEAPIToken=gha@pve!gha-token=${{ secrets.PVE_TOKEN }}'
             
