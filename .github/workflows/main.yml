@@ -13,13 +13,13 @@ jobs:
       #- run: make package
       # Install deb
       #- run: sudo apt install ./ui-act_*.deb
-      # Restart gnome before the extension can be enabled
-      - run: sudo systemctl restart gdm3 && gnome-extensions enable ui-act@tobiasnorlund.github.com
+      # Restart gnome before the extension can be enabled (sleep for gdm to restart properly)
+      - run: sudo systemctl restart gdm3 && sleep 30 && gnome-extensions enable ui-act@tobiasnorlund.github.com
       # Set api key and disable telemetry
       - run: gsettings --schemadir /usr/share/gnome-shell/extensions/ui-act@tobiasnorlund.github.com/schemas set org.gnome.shell.extensions.ui-act telemetry-enabled false
       - run: gsettings --schemadir /usr/share/gnome-shell/extensions/ui-act@tobiasnorlund.github.com/schemas set org.gnome.shell.extensions.ui-act anthropic-api-key ${{ secrets.ANTHROPIC_API_KEY }}
       # Start a calculator and launch UI-Act on it
-      - run: DISPLAY=:0 gnome-calculator & sleep 30
+      - run: DISPLAY=:0 gnome-calculator & sleep 5
       - run: DISPLAY=:0 xdotool key ctrl+space && sleep 2 && DISPLAY=:0 xdotool type 'Calculate 3+4' && sleep 1
       # Save screenshot
       - run: DISPLAY=:0 scrot screen.png
