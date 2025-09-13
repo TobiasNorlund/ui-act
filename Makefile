@@ -62,7 +62,7 @@ package: prepare-install
 	@echo "Homepage: https://github.com/tobiasnorlund/CoX" >> $(INSTALL_DIR)/DEBIAN/control
 	@echo "Section: utils" >> $(INSTALL_DIR)/DEBIAN/control
 	@echo "Priority: optional" >> $(INSTALL_DIR)/DEBIAN/control
-	@echo "Depends: gnome-shell, dbus-x11" >> $(INSTALL_DIR)/DEBIAN/control
+	@echo "Depends: gnome-shell" >> $(INSTALL_DIR)/DEBIAN/control
 	
 	@# Create postinst script for extension installation
 	@echo "#!/bin/bash" > $(INSTALL_DIR)/DEBIAN/postinst
