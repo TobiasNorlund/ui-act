@@ -26,7 +26,7 @@ jobs:
           echo "vmid=$VMID" >> $GITHUB_OUTPUT
       - name: Start VM
         run: |
-          curl -vkf -X POST "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/200/status/start" \
+          curl -vkf -X POST "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/${{ steps.clone.outputs.vmid }}/status/start" \
             -H 'Authorization: PVEAPIToken=gha@pve!gha-token=${{ secrets.PVE_TOKEN }}'
       - name: Wait for runner to connect
         run: |
