@@ -12,7 +12,7 @@ use crate::telemetry::post_telemetry;
 use crate::env::{ComputerEnvironment, full_desktop::FullDesktopEnvironment, single_window::SingleWindowEnvironment};
 
 
-const USAGE: &str = "Usage: ui-act [--window <window_id>] [--no-telemetry] [--help] <prompt>";
+const USAGE: &str = "Usage: ui-act [--window <window_id>] [--no-telemetry] [--help] [--version] <prompt>";
 
 
 fn on_error(msg: &str) -> ! {
@@ -51,19 +51,19 @@ fn get_signal_handler() -> tokio::task::JoinHandle<()> {
 
 #[tokio::main]
 async fn main() -> () {
-
-    let signal_handle = get_signal_handler();
-
     let mut args = std_env::args();
     let _exe = args.next(); // skip executable name
     let mut window_id = None;
-    let mut prompt = None;
     let mut send_telemetry: bool = true;
     
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--help" => {
                 eprintln!("{}", USAGE);
+                std::process::exit(0);
+            }
+            "--version" => {
+                println!("ui-act version {}", env!("CARGO_PKG_VERSION"));
                 std::process::exit(0);
             }
             "--no-telemetry" => {
@@ -74,13 +74,20 @@ async fn main() -> () {
                     .unwrap_or_else(|_| { on_error("Unable to parse window as int")});
             }
             _ => {
-                prompt = Some(arg);
-                break;
+                // Collect all remaining arguments as the prompt
+                let mut prompt_parts = vec![arg];
+                prompt_parts.extend(args);
+                let prompt = prompt_parts.join(" ");
+                return run_with_prompt(prompt, window_id, send_telemetry).await;
             }
         }
     }
     
-    let prompt = prompt.unwrap_or_else(|| { on_error("Missing required prompt argument") });
+    on_error("Missing required prompt argument");
+}
+
+async fn run_with_prompt(prompt: String, window_id: Option<u32>, send_telemetry: bool) {
+    let signal_handle = get_signal_handler();
     
     let agent = AnthropicAgent::create().await
         .unwrap_or_else(|e| { on_error(&e.to_string()) });
@@ -102,14 +109,14 @@ async fn main() -> () {
         post_telemetry(&agent.session_id, &env.name(), "session_start", None, None).await;
     }
 
-        tokio::select! {
-            res = agent.run(&mut env, &prompt, send_telemetry) => {
-                res.unwrap_or_else(|e| { on_error(&e.to_string()) });
+    tokio::select! {
+        res = agent.run(&mut env, &prompt, send_telemetry) => {
+            res.unwrap_or_else(|e| { on_error(&e.to_string()) });
+        }
+        _ = signal_handle => {
+            if send_telemetry {
+                post_telemetry(&agent.session_id, &env.name(), "session_end", Some("interrupted"), Some(agent.action_count.get())).await;
             }
-            _ = signal_handle => {
-                if send_telemetry {
-                    post_telemetry(&agent.session_id, &env.name(), "session_end", Some("interrupted"), Some(agent.action_count.get())).await;
-                }
-            }
+        }
     }
 }
