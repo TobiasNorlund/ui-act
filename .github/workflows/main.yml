@@ -4,10 +4,117 @@ on:
   workflow_dispatch:
 
 jobs:
+
+  create-vm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone template VM
+        id: clone
+        run: |
+          VMID=$((2000 + RANDOM % 1000))
+          NAME=gha-${{ github.run_id }}
+          curl -vkf -X POST "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/114/clone" \
+            -H 'Authorization: PVEAPIToken=gha@pve!gha-token=${{ secrets.PVE_TOKEN }}' \
+            -d "newid=$VMID" \
+            -d "name=$NAME" \
+            -d "target=alix"
+          sleep 5
+          echo "vmid=$VMID" >> $GITHUB_OUTPUT
+      - name: Start VM
+        run: |
+          curl -vkf -X POST "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/${{ steps.clone.outputs.vmid }}/status/start" \
+            -H 'Authorization: PVEAPIToken=gha@pve!gha-token=${{ secrets.PVE_TOKEN }}'
+      - name: Wait for runner to connect
+        run: |
+          echo "Waiting for runner to become available..."
+          for i in {1..30}; do
+            RUNNER_AVAILABLE=$(gh api repos/${{ github.repository }}/actions/runners \
+              -q '(.runners[] | select(.name == "uiact-test" and .busy == false and .status == "online")) | if . then 1 else 0 end // 0')
+            if [[ "$RUNNER_AVAILABLE" == "1" ]]; then
+              echo "Runner is available! (attempt $i/30)"
+              exit 0
+            else
+              echo "Attempt $i/30: Runner not available, waiting..."
+              sleep 10
+            fi
+          done
+          echo "Timeout: Runner did not become available" >&2
+          exit 1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}   
+    outputs:
+      vmid: ${{ steps.clone.outputs.vmid }}
+
   run-tests:
+    needs: create-vm
     runs-on: proxmox
     steps:
       - uses: actions/checkout@v4
-      - run: echo "Now running inside the VM!"
-      - run: uname -a
+      # Build deb package
       - run: make package
+      # Install deb
+      - run: sudo apt install ./ui-act_*.deb
+      # Restart gnome before the extension can be enabled (sleep for gdm to restart properly)
+      - run: sudo systemctl restart gdm3 && sleep 60 && gnome-extensions enable ui-act@tobiasnorlund.github.com
+      # Set api key and disable telemetry
+      - run: gsettings --schemadir /usr/share/gnome-shell/extensions/ui-act@tobiasnorlund.github.com/schemas set org.gnome.shell.extensions.ui-act telemetry-enabled false
+      - run: gsettings --schemadir /usr/share/gnome-shell/extensions/ui-act@tobiasnorlund.github.com/schemas set org.gnome.shell.extensions.ui-act anthropic-api-key ${{ secrets.ANTHROPIC_API_KEY }}
+      # Start a calculator and launch UI-Act on it (for some reason gnome-calculator opens very slowly sometimes)
+      - run: gnome-calculator & sleep 30
+      - run: xdotool key ctrl+space && sleep 2 && xdotool type 'Calculate 3+4' && sleep 1
+      # Save launcher screenshot before kicking off
+      - run: scrot launcher-screen.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-act-launcher-screen
+          path: launcher-screen.png
+      # Hit enter to kick off agent, wait 30s and take screenshot to inspect result
+      - run: xdotool key Return && sleep 30 && scrot result-screen.png && sleep 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: result-screen
+          path: result-screen.png
+
+  cleanup-vm:
+    if: always()
+    needs: [create-vm, run-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stop VM
+        run: |
+          VMID=${{ needs.create-vm.outputs.vmid }}
+          curl -vkf -X POST "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/$VMID/status/stop" \
+            -H 'Authorization: PVEAPIToken=gha@pve!gha-token=${{ secrets.PVE_TOKEN }}'
+            
+      - name: Wait for VM to stop
+        run: |
+          VMID=${{ needs.create-vm.outputs.vmid }}
+          echo "Waiting for VM $VMID to stop..."
+          for i in {1..30}; do
+            STATUS=$(curl -skf "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/$VMID/status/current" \
+              -H 'Authorization: PVEAPIToken=gha@pve!gha-token=${{ secrets.PVE_TOKEN }}' \
+              | jq -r '.data.status // "unknown"')
+            
+            echo "Attempt $i/30: VM status is '$STATUS'"
+            
+            if [[ "$STATUS" == "stopped" ]]; then
+              echo "VM has stopped successfully!"
+              break
+            elif [[ "$STATUS" == "unknown" ]]; then
+              echo "Could not retrieve VM status"
+            fi
+            
+            if [[ $i -eq 30 ]]; then
+              echo "Warning: VM did not stop within 5 minutes, proceeding with deletion anyway"
+            else
+              sleep 10
+            fi
+          done
+      
+      - name: Delete VM
+        run: |
+          VMID=${{ needs.create-vm.outputs.vmid }}
+          echo "Deleting VM $VMID..."
+          curl -vkf -X DELETE "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/$VMID" \
+            -H 'Authorization: PVEAPIToken=gha@pve!gha-token=${{ secrets.PVE_TOKEN }}'
+          echo "VM $VMID deletion initiated"
