@@ -82,7 +82,7 @@ jobs:
   cleanup-vm:
     if: always()
     needs: [create-vm, run-tests]
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - name: Stop VM
         run: |
