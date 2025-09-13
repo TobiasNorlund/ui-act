@@ -87,7 +87,7 @@ jobs:
       - name: Stop VM
         run: |
           VMID=${{ needs.prepare-vm.outputs.vmid }}
-          curl -vk -X POST "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/$VMID/status/stop" \
+          curl -vkf -X POST "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/$VMID/status/stop" \
             -H 'Authorization: PVEAPIToken=gha@pve!gha-token=${{ secrets.PVE_TOKEN }}'
             
       - name: Wait for VM to stop
@@ -95,7 +95,7 @@ jobs:
           VMID=${{ needs.create-vm.outputs.vmid }}
           echo "Waiting for VM $VMID to stop..."
           for i in {1..30}; do
-            STATUS=$(curl -sk "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/$VMID/status/current" \
+            STATUS=$(curl -skf "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/$VMID/status/current" \
               -H 'Authorization: PVEAPIToken=gha@pve!gha-token=${{ secrets.PVE_TOKEN }}' \
               | jq -r '.data.status // "unknown"')
             
@@ -119,6 +119,6 @@ jobs:
         run: |
           VMID=${{ needs.create-vm.outputs.vmid }}
           echo "Deleting VM $VMID..."
-          curl -vk -X DELETE "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/$VMID" \
+          curl -vkf -X DELETE "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/$VMID" \
             -H 'Authorization: PVEAPIToken=gha@pve!gha-token=${{ secrets.PVE_TOKEN }}'
           echo "VM $VMID deletion initiated"
