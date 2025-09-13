@@ -340,7 +340,6 @@ export default class UIActExtension extends Extension {
             
             // Launch ui_act in a new terminal window
             let terminalCommand = [
-                'dbus-launch',
                 'gnome-terminal',
                 '--',
                 'ui-act',
