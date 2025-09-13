@@ -18,16 +18,16 @@ jobs:
       - run: gsettings --schemadir /usr/share/gnome-shell/extensions/ui-act@tobiasnorlund.github.com/schemas set org.gnome.shell.extensions.ui-act telemetry-enabled false
       - run: gsettings --schemadir /usr/share/gnome-shell/extensions/ui-act@tobiasnorlund.github.com/schemas set org.gnome.shell.extensions.ui-act anthropic-api-key ${{ secrets.ANTHROPIC_API_KEY }}
       # Start a calculator and launch UI-Act on it (for some reason gnome-calculator opens very slowly sometimes)
-      - run: DISPLAY=:0 gnome-calculator & sleep 30
-      - run: DISPLAY=:0 xdotool key ctrl+space && sleep 2 && DISPLAY=:0 xdotool type 'Calculate 3+4' && sleep 1
+      - run: gnome-calculator & sleep 30
+      - run: xdotool key ctrl+space && sleep 2 && xdotool type 'Calculate 3+4' && sleep 1
       # Save launcher screenshot before kicking off
-      - run: DISPLAY=:0 scrot launcher-screen.png
+      - run: scrot launcher-screen.png
       - uses: actions/upload-artifact@v4
         with:
           name: ui-act-launcher-screen
           path: launcher-screen.png
       # Hit enter to kick off agent, wait 30s and take screenshot to inspect result
-      - run: DISPLAY=:0 xdotool key Return && sleep 30 && DISPLAY=:0 scrot result-screen.png && sleep 1
+      - run: xdotool key Return && sleep 30 && scrot result-screen.png && sleep 1
       - uses: actions/upload-artifact@v4
         with:
           name: result-screen
