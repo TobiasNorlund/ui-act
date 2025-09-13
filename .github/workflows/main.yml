@@ -45,8 +45,7 @@ jobs:
           echo "Timeout: Runner did not become available" >&2
           exit 1
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
-            
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}   
     outputs:
       vmid: ${{ steps.clone.outputs.vmid }}
 
@@ -79,3 +78,47 @@ jobs:
         with:
           name: result-screen
           path: result-screen.png
+
+  cleanup-vm:
+    if: always()
+    needs: [create-vm, run-tests]
+    runs-on: self-hosted
+    steps:
+      - name: Stop VM
+        run: |
+          VMID=${{ needs.prepare-vm.outputs.vmid }}
+          curl -vk -X POST "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/$VMID/status/stop" \
+            -H 'Authorization: PVEAPIToken=gha@pve!gha-token=${{ secrets.PVE_TOKEN }}'
+            
+      - name: Wait for VM to stop
+        run: |
+          VMID=${{ needs.create-vm.outputs.vmid }}
+          echo "Waiting for VM $VMID to stop..."
+          for i in {1..30}; do
+            STATUS=$(curl -sk "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/$VMID/status/current" \
+              -H 'Authorization: PVEAPIToken=gha@pve!gha-token=${{ secrets.PVE_TOKEN }}' \
+              | jq -r '.data.status // "unknown"')
+            
+            echo "Attempt $i/30: VM status is '$STATUS'"
+            
+            if [[ "$STATUS" == "stopped" ]]; then
+              echo "VM has stopped successfully!"
+              break
+            elif [[ "$STATUS" == "unknown" ]]; then
+              echo "Could not retrieve VM status"
+            fi
+            
+            if [[ $i -eq 30 ]]; then
+              echo "Warning: VM did not stop within 5 minutes, proceeding with deletion anyway"
+            else
+              sleep 10
+            fi
+          done
+      
+      - name: Delete VM
+        run: |
+          VMID=${{ needs.create-vm.outputs.vmid }}
+          echo "Deleting VM $VMID..."
+          curl -vk -X DELETE "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/$VMID" \
+            -H 'Authorization: PVEAPIToken=gha@pve!gha-token=${{ secrets.PVE_TOKEN }}'
+          echo "VM $VMID deletion initiated"
