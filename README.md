@@ -1,4 +1,12 @@
-<img src="launcher/images/uiact_bw.svg" alt="UI Act" width="200" />
+<p align="center">
+  <img src="launcher/images/uiact_bw.svg" alt="UI Act" width="200" />
+  <br/><br/>
+  <a href="https://github.com/TobiasNorlund/ui-act/releases/latest"><img src="https://img.shields.io/github/v/release/TobiasNorlund/ui-act" alt="Latest Release" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/TobiasNorlund/ui-act" alt="License" /></a>
+  <img src="https://img.shields.io/badge/platform-linux-blue" alt="Platform: Linux" />
+</p>
+
+---
 
 **UI Act** is a Computer Use/GUI agent software that works alongside you on your Linux desktop. Just press `CTRL + Space`, type your prompt and the agent will kick off — **_using its own mouse and keyboard_** . Have a look:
 
