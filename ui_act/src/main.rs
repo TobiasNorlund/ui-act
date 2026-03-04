@@ -12,7 +12,8 @@ use crate::telemetry::post_telemetry;
 use crate::env::{ComputerEnvironment, full_desktop::FullDesktopEnvironment, single_window::SingleWindowEnvironment};
 
 
-const USAGE: &str = "Usage: ui-act [--window <window_id>] [--no-telemetry] [--help] [--version] <prompt>";
+const DEFAULT_MODEL: &str = "claude-opus-4-6";
+const USAGE: &str = "Usage: ui-act [--window <window_id>] [--model <model_id>] [--no-telemetry] [--help] [--version] <prompt>";
 
 
 fn on_error(msg: &str) -> ! {
@@ -55,7 +56,8 @@ async fn main() -> () {
     let _exe = args.next(); // skip executable name
     let mut window_id = None;
     let mut send_telemetry: bool = true;
-    
+    let mut model = DEFAULT_MODEL.to_string();
+
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--help" => {
@@ -73,12 +75,15 @@ async fn main() -> () {
                 window_id = args.next().map(|id| id.parse::<u32>()).transpose()
                     .unwrap_or_else(|_| { on_error("Unable to parse window as int")});
             }
+            "--model" => {
+                model = args.next().unwrap_or_else(|| { on_error("--model requires a model id argument") });
+            }
             _ => {
                 // Collect all remaining arguments as the prompt
                 let mut prompt_parts = vec![arg];
                 prompt_parts.extend(args);
                 let prompt = prompt_parts.join(" ");
-                return run_with_prompt(prompt, window_id, send_telemetry).await;
+                return run_with_prompt(prompt, window_id, model, send_telemetry).await;
             }
         }
     }
@@ -86,10 +91,10 @@ async fn main() -> () {
     on_error("Missing required prompt argument");
 }
 
-async fn run_with_prompt(prompt: String, window_id: Option<u32>, send_telemetry: bool) {
+async fn run_with_prompt(prompt: String, window_id: Option<u32>, model: String, send_telemetry: bool) {
     let signal_handle = get_signal_handler();
-    
-    let agent = AnthropicAgent::create().await
+
+    let agent = AnthropicAgent::create(model).await
         .unwrap_or_else(|e| { on_error(&e.to_string()) });
     let mut env: Box<dyn ComputerEnvironment> = match window_id {
         Some(wid) => {

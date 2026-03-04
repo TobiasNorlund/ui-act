@@ -92,21 +92,23 @@ const ANTHROPIC_MAX_HEIGHT: u32 = 768;
 pub struct AnthropicAgent {
     client: reqwest::Client,
     api_key: String,
+    model: String,
     pub session_id: String,
     pub action_count: std::cell::Cell<u32>,
 }
 
 impl AnthropicAgent {
-    pub async fn create() -> Result<Self> {
+    pub async fn create(model: String) -> Result<Self> {
         let client = reqwest::Client::new();
         let api_key = std::env::var("ANTHROPIC_API_KEY")?;
         let agent = AnthropicAgent {
-            client, 
+            client,
             api_key,
+            model,
             session_id: Uuid::new_v4().to_string(),
             action_count: std::cell::Cell::new(0),
         };
-        
+
         Ok(agent)
     }
 
@@ -291,7 +293,7 @@ impl AnthropicAgent {
 
     pub async fn get_response(&self, display_width_px: u32, display_height_px: u32, messages: &Vec<Message>) -> Result<reqwest::Response, reqwest::Error> {
         let content = json!({
-            "model": "claude-sonnet-4-20250514",
+            "model": self.model,
             "max_tokens": 1024,
             "tools": [{
                 "type": "computer_20250124",
