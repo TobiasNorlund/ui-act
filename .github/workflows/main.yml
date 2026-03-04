@@ -13,7 +13,7 @@ jobs:
         run: |
           VMID=$((2000 + RANDOM % 1000))
           NAME=gha-${{ github.run_id }}
-          curl -vkf -X POST "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/114/clone" \
+          curl -vkf -X POST "https://norlund.mine.nu:8006/api2/json/nodes/alix/qemu/115/clone" \
             -H 'Authorization: PVEAPIToken=gha@pve!gha-token=${{ secrets.PVE_TOKEN }}' \
             -d "newid=$VMID" \
             -d "name=$NAME" \
