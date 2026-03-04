@@ -62,7 +62,7 @@ pub enum ToolInput {
     #[serde(rename = "key")]
     Key { text: String },
     #[serde(rename = "scroll")]
-    Scroll { scroll_direction: String, scroll_amount: u32 },
+    Scroll { coordinate: [u32; 2], scroll_direction: String, scroll_amount: u32 },
     #[serde(rename = "hold_key")]
     HoldKey { text: String, duration: u32 },
     #[serde(rename = "left_mouse_down")]
@@ -73,7 +73,8 @@ pub enum ToolInput {
     LeftClickDrag { coordinate: [u32; 2] },
     #[serde(rename = "wait")]
     Wait { duration: u32 },
-    // TODO: Fill out
+    #[serde(rename = "zoom")]
+    Zoom { region: [u32; 4] },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -92,21 +93,23 @@ const ANTHROPIC_MAX_HEIGHT: u32 = 768;
 pub struct AnthropicAgent {
     client: reqwest::Client,
     api_key: String,
+    model: String,
     pub session_id: String,
     pub action_count: std::cell::Cell<u32>,
 }
 
 impl AnthropicAgent {
-    pub async fn create() -> Result<Self> {
+    pub async fn create(model: String) -> Result<Self> {
         let client = reqwest::Client::new();
         let api_key = std::env::var("ANTHROPIC_API_KEY")?;
         let agent = AnthropicAgent {
-            client, 
+            client,
             api_key,
+            model,
             session_id: Uuid::new_v4().to_string(),
             action_count: std::cell::Cell::new(0),
         };
-        
+
         Ok(agent)
     }
 
@@ -187,7 +190,10 @@ impl AnthropicAgent {
                                 ToolInput::Key { text } => {
                                     env.press_key(text)?;
                                 }
-                                ToolInput::Scroll { scroll_direction, scroll_amount } => {
+                                ToolInput::Scroll { coordinate, scroll_direction, scroll_amount } => {
+                                    let x = (coordinate[0] as f32 / scale).round() as u32;
+                                    let y = (coordinate[1] as f32 / scale).round() as u32;
+                                    env.mouse_move(x, y)?;
                                     env.scroll(scroll_direction, *scroll_amount)?;
                                 }
                                 ToolInput::HoldKey { text, duration } => {
@@ -209,6 +215,24 @@ impl AnthropicAgent {
                                 }
                                 ToolInput::Screenshot => {
                                     // Do nothing, screenshot will be provided below
+                                }
+                                ToolInput::Zoom { region } => {
+                                    let x1 = region[0].min(screenshot.width());
+                                    let y1 = region[1].min(screenshot.height());
+                                    let x2 = region[2].min(screenshot.width());
+                                    let y2 = region[3].min(screenshot.height());
+                                    let w = x2.saturating_sub(x1);
+                                    let h = y2.saturating_sub(y1);
+                                    let cropped = image::imageops::crop_imm(&screenshot, x1, y1, w, h).to_image();
+                                    next_message.content.push(ContentBlock::ToolResult {
+                                        content: vec![ContentBlock::Image { source: ImageSource::Base64 {
+                                            media_type: "image/png".to_string(),
+                                            data: rgb_image_to_base64_png(&cropped)?
+                                        }}],
+                                        tool_use_id: id.clone(),
+                                        is_error: false
+                                    });
+                                    continue;
                                 }
                             }
 
@@ -291,14 +315,15 @@ impl AnthropicAgent {
 
     pub async fn get_response(&self, display_width_px: u32, display_height_px: u32, messages: &Vec<Message>) -> Result<reqwest::Response, reqwest::Error> {
         let content = json!({
-            "model": "claude-sonnet-4-20250514",
+            "model": self.model,
             "max_tokens": 1024,
             "tools": [{
-                "type": "computer_20250124",
+                "type": "computer_20251124",
                 "name": "computer",
                 "display_width_px": display_width_px,
                 "display_height_px": display_height_px,
-                "display_number": 1
+                "display_number": 1,
+                "enable_zoom": true
             }],
             "messages": messages
         });
@@ -307,7 +332,7 @@ impl AnthropicAgent {
             .header("content-type", "application/json")
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
-            .header("anthropic-beta", "computer-use-2025-01-24")
+            .header("anthropic-beta", "computer-use-2025-11-24")
             .json(&content)
             .send()
             .await

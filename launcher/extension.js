@@ -333,11 +333,12 @@ export default class UIActExtension extends Extension {
             console.log(`Running UI Act with windowId: ${windowId} and prompt: ${prompt}`);
             let anthropicApiKey = this._settings.get_string('anthropic-api-key');
             let sendTelemetry = this._settings.get_boolean('telemetry-enabled');
+            let model = this._settings.get_string('anthropic-model');
             let launcher = new Gio.SubprocessLauncher({
                 flags: Gio.SubprocessFlags.NONE,
             });
             launcher.setenv('ANTHROPIC_API_KEY', anthropicApiKey, true);
-            
+
             // Launch ui_act in a new terminal window
             let terminalCommand = [
                 'gnome-terminal',
@@ -345,6 +346,8 @@ export default class UIActExtension extends Extension {
                 'ui-act',
                 '--window',
                 windowId.toString(),
+                '--model',
+                model,
                 ...(sendTelemetry ? [] : ["--no-telemetry"]),
                 prompt
             ];
