@@ -35,9 +35,21 @@ export default class MyExtensionPreferences extends ExtensionPreferences {
         const anthropicApiKey = new Adw.PasswordEntryRow({title: 'Anthropic'});
         apiPrefGroup.add(anthropicApiKey);
 
+        // Create Model preferences group
+        const modelPrefGroup = new Adw.PreferencesGroup({
+            title: 'Model',
+            description: 'Configure the Anthropic model to use'
+        });
+        page.add(modelPrefGroup);
+        const anthropicModel = new Adw.EntryRow({
+            title: 'Model ID',
+        });
+        modelPrefGroup.add(anthropicModel);
+
         // Bind to GSettings
         const settings = this.getSettings();
         settings.bind('anthropic-api-key', anthropicApiKey, 'text', Gio.SettingsBindFlags.DEFAULT);
+        settings.bind('anthropic-model', anthropicModel, 'text', Gio.SettingsBindFlags.DEFAULT);
         settings.bind('telemetry-enabled', telemetryRow, 'active', Gio.SettingsBindFlags.DEFAULT);
     }
 }
