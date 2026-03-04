@@ -47,10 +47,11 @@ The package installs a CLI tool `ui-act` that runs the agent, and a GNOME extens
 The `ui-act` command support running a GUI agent across the full desktop, or in a "single window" mode. In single window mode, the agent only gets screenshots and can only act in this window. To ensure the window is not obstructed, it is set to "Always on top" for as long as the agent runs.
 
 ```
-ui-act [--window <window_id>] [--no-telemetry] [--help] <prompt>
+ui-act [--window <window_id>] [--model <model_id>] [--no-telemetry] [--help] <prompt>
 ```
 
 - `--window <window_id>` - (optional) If provided an X window id (obtainable via e.g. `xwininfo`), run in "single window" mode.
+- `--model <model_id>` - (optional) Anthropic model to use. Defaults to `claude-opus-4-6`.
 - `--no-telemetry` - Anonymous usage statistics is sent for improving UI Act, but you can opt-out by providing this flag. No user data (prompts, screenshots or api keys) is sent. See for yourself [in the code](ui_act/src/telemetry.rs).
 - `prompt` - A string like "In the open browser, go to Amazon and find me some Ray-Ban Meta Glasses"
 
