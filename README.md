@@ -2,7 +2,7 @@
   <img src="launcher/images/uiact_bw.svg" alt="UI Act" width="200" />
   <br/><br/>
   <a href="https://github.com/TobiasNorlund/ui-act/releases/latest"><img src="https://img.shields.io/github/v/release/TobiasNorlund/ui-act" alt="Latest Release" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/TobiasNorlund/ui-act" alt="License" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License" /></a>
   <img src="https://img.shields.io/badge/platform-linux-blue" alt="Platform: Linux" />
 </p>
 
